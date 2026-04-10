@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { countries, CountryData, type RiskScores, CATEGORY_LABELS, getSeverityColor } from '@/data/types';
+import { type CountryData, type RiskScores, CATEGORY_LABELS, getSeverityColor } from '@/data/types';
 import { countries as allCountries, alerts, feedItems, globalMetrics } from '@/data/mockData';
 import { TerminalCard } from '@/components/TerminalCard';
 import { MetricCard } from '@/components/MetricCard';
