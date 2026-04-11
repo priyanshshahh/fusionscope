@@ -244,8 +244,8 @@ function GlobeMesh({ countries, activeLayers, onSelectCountry, selectedCountry }
       {/* Grid lines */}
       <GlobeGrid radius={radius} />
 
-      {/* Continent outlines */}
-      <ContinentOutlines radius={radius} />
+      {/* Filled continents */}
+      <ContinentFills radius={radius} />
 
       {/* Country markers */}
       {countries.map(country => (
