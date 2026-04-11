@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { OrbitControls, Sphere, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CountryData, RiskScores } from '@/data/types';
@@ -220,32 +220,29 @@ function GlobeMesh({ countries, activeLayers, onSelectCountry, selectedCountry }
 
   return (
     <group ref={globeRef}>
-      {/* Globe sphere */}
-      <Sphere args={[radius, 64, 64]}>
-        <meshStandardMaterial
-          color="#0a1628"
-          transparent
-          opacity={0.9}
-          roughness={0.8}
-          metalness={0.1}
-        />
-      </Sphere>
+      {/* Globe sphere with earth texture */}
+      <EarthSphere radius={radius} />
 
       {/* Atmosphere glow */}
       <Sphere args={[radius * 1.02, 64, 64]}>
         <meshStandardMaterial
           color="#0ea5e9"
           transparent
-          opacity={0.04}
+          opacity={0.06}
+          side={THREE.BackSide}
+        />
+      </Sphere>
+      <Sphere args={[radius * 1.06, 64, 64]}>
+        <meshStandardMaterial
+          color="#3b82f6"
+          transparent
+          opacity={0.03}
           side={THREE.BackSide}
         />
       </Sphere>
 
       {/* Grid lines */}
       <GlobeGrid radius={radius} />
-
-      {/* Filled continents */}
-      <ContinentFills radius={radius} />
 
       {/* Country markers */}
       {countries.map(country => (
