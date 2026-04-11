@@ -1,7 +1,5 @@
 
 
-***
-
 # 🌍 FusionScope - Global Crisis Fusion Dashboard
 
 A production-ready full-stack application providing real-time global crisis monitoring, risk analysis, and geopolitical intelligence through an advanced fusion algorithm.
