@@ -1,10 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
-import { countries, alerts, feedItems } from '@/data/mockData';
-import { CATEGORY_LABELS, getSeverityColor } from '@/data/types';
+import { useState, useEffect } from 'react';
+import { countries as countriesMock, alerts as alertsMock, feedItems as feedItemsMock } from '@/data/mockData';
+import { CATEGORY_LABELS, getSeverityColor, type CountryData } from '@/data/types';
 import { TerminalCard } from '@/components/TerminalCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { Activity, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { apiClient } from '@/lib/api';
 
 const barColors: Record<string, string> = {
   waterStress: '#0ea5e9',
@@ -15,9 +17,105 @@ const barColors: Record<string, string> = {
   infrastructureDisruption: '#a855f7',
 };
 
+// Helper function to convert API response to frontend format
+function convertApiCountryToFrontend(apiCountry: any): CountryData {
+  const trend = Array.from({ length: 12 }, () => 
+    Math.round(apiCountry.fusion_score + Math.random() * 10 - 5)
+  );
+  
+  return {
+    id: apiCountry.code,
+    name: apiCountry.name,
+    region: apiCountry.region,
+    lat: apiCountry.lat,
+    lon: apiCountry.lon,
+    risks: {
+      waterStress: apiCountry.risks.water_stress,
+      drought: apiCountry.risks.drought,
+      flood: apiCountry.risks.flood,
+      foodInsecurity: apiCountry.risks.food_insecurity,
+      migrationPressure: apiCountry.risks.migration_pressure,
+      infrastructureDisruption: apiCountry.risks.infrastructure_disruption,
+    },
+    fusionScore: apiCountry.fusion_score,
+    severity: apiCountry.severity,
+    summary: apiCountry.ai_summary,
+    trend,
+  };
+}
+
 export default function CountryDetail() {
   const { id } = useParams<{ id: string }>();
-  const country = countries.find(c => c.id === id);
+  const [country, setCountry] = useState<CountryData | null>(null);
+  const [countryAlerts, setCountryAlerts] = useState<any[]>([]);
+  const [countryFeed, setCountryFeed] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch country data from API
+  useEffect(() => {
+    const fetchCountryData = async () => {
+      try {
+        setLoading(true);
+        
+        if (!id) {
+          setCountry(null);
+          return;
+        }
+
+        // Fetch country data
+        const countryResult = await apiClient.getCountry(id.toUpperCase());
+        if (countryResult.status === 'success' && countryResult.data) {
+          const convertedCountry = convertApiCountryToFrontend(countryResult.data);
+          setCountry(convertedCountry);
+
+          // Fetch country alerts
+          const alertsResult = await apiClient.getCountryAlerts(id.toUpperCase());
+          if (alertsResult.status === 'success' && alertsResult.data) {
+            setCountryAlerts(alertsResult.data);
+          }
+
+          // Fetch country feed
+          const feedResult = await apiClient.getCountryFeed(id.toUpperCase());
+          if (feedResult.status === 'success' && feedResult.data) {
+            setCountryFeed(feedResult.data);
+          }
+        } else {
+          // Try mock data as fallback
+          const mockCountry = countriesMock.find(c => c.id.toLowerCase() === id?.toLowerCase());
+          if (mockCountry) {
+            setCountry(mockCountry);
+            setCountryAlerts(alertsMock.filter(a => a.countryId === mockCountry.id));
+            setCountryFeed(feedItemsMock.filter(f => f.countryId === mockCountry.id));
+          } else {
+            setCountry(null);
+          }
+        }
+      } catch (error) {
+        console.warn('Fetch failed, falling back to mock data:', error);
+        // Fallback to mock data
+        const mockCountry = countriesMock.find(c => c.id.toLowerCase() === id?.toLowerCase());
+        if (mockCountry) {
+          setCountry(mockCountry);
+          setCountryAlerts(alertsMock.filter(a => a.countryId === mockCountry.id));
+          setCountryFeed(feedItemsMock.filter(f => f.countryId === mockCountry.id));
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCountryData();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="font-mono text-muted-foreground mb-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!country) {
     return (
@@ -30,8 +128,6 @@ export default function CountryDetail() {
     );
   }
 
-  const countryAlerts = alerts.filter(a => a.countryId === country.id);
-  const countryFeed = feedItems.filter(f => f.countryId === country.id);
   const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
   const trendData = country.trend.map((v, i) => ({ month: months[i], score: v }));
   const riskBars = Object.entries(country.risks).map(([key, val]) => ({
