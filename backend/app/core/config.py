@@ -28,3 +28,9 @@ if os.getenv("DATABASE_URL"):
     settings.database_url = os.getenv("DATABASE_URL")
 if os.getenv("DEBUG"):
     settings.debug = os.getenv("DEBUG", "False").lower() == "true"
+if os.getenv("ALLOWED_ORIGINS"):
+    settings.allowed_origins = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]

@@ -172,6 +172,7 @@ DATABASE_URL=postgresql://user:password@localhost/fusionscope
 DEBUG=False
 HOST=0.0.0.0
 PORT=8000
+ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
 ```
 
 ## Deployment
@@ -254,13 +255,10 @@ By default, CORS is enabled for:
 - `http://127.0.0.1:8080`
 - `http://127.0.0.1:3000`
 
-Update `app/core/config.py` for production URLs:
+Set `ALLOWED_ORIGINS` as a comma-separated list in your environment:
 
-```python
-allowed_origins = [
-    "https://fusionscope.example.com",
-    "https://app.fusionscope.example.com",
-]
+```env
+ALLOWED_ORIGINS=https://your-vercel-app.vercel.app,https://your-custom-domain.com
 ```
 
 ## Testing
@@ -296,7 +294,7 @@ python -m scripts.seed
 Access to XMLHttpRequest blocked by CORS policy
 ```
 
-**Solution**: Update `allowed_origins` in `app/core/config.py`
+**Solution**: Ensure `ALLOWED_ORIGINS` includes your frontend domain
 
 ### Port Already in Use
 

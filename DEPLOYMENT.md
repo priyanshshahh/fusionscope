@@ -4,6 +4,33 @@ Complete guide for deploying FusionScope to production environments.
 
 ---
 
+## ⚡ Hackathon Fast Path (Vercel Frontend + Hosted Backend)
+
+If you need a fast, reliable setup for judging, use this exact flow:
+
+1. Deploy backend first (Render/Railway/Heroku).
+2. Set backend environment variables:
+  - `DATABASE_URL`
+  - `DEBUG=False`
+  - `ALLOWED_ORIGINS=https://your-vercel-app.vercel.app`
+3. Seed backend data:
+  - `python -m scripts.seed`
+4. Verify backend is live:
+  - `GET https://your-backend-domain/api/health`
+5. Deploy frontend on Vercel.
+6. In Vercel project environment variables set:
+  - `VITE_API_BASE_URL=https://your-backend-domain`
+7. Redeploy frontend and verify network calls hit your backend domain.
+
+Quick check after deploy:
+
+```bash
+curl https://your-backend-domain/api/health
+curl https://your-backend-domain/api/countries
+```
+
+---
+
 ## 📋 Pre-Deployment Checklist
 
 - [ ] All code committed to git
