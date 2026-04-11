@@ -15,36 +15,33 @@ function latLonToVector3(lat: number, lon: number, radius: number): THREE.Vector
 }
 
 function GlobeGrid({ radius }: { radius: number }) {
-  const lines = useMemo(() => {
-    const geometries: THREE.BufferGeometry[] = [];
+  const lineObjects = useMemo(() => {
+    const material = new THREE.LineBasicMaterial({ color: '#1e3a5f', transparent: true, opacity: 0.3 });
+    const result: THREE.Line[] = [];
 
-    // Latitude lines
     for (let lat = -60; lat <= 60; lat += 30) {
       const points: THREE.Vector3[] = [];
       for (let lon = 0; lon <= 360; lon += 5) {
         points.push(latLonToVector3(lat, lon - 180, radius + 0.005));
       }
-      geometries.push(new THREE.BufferGeometry().setFromPoints(points));
+      result.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material));
     }
 
-    // Longitude lines
     for (let lon = -180; lon < 180; lon += 30) {
       const points: THREE.Vector3[] = [];
       for (let lat = -90; lat <= 90; lat += 5) {
         points.push(latLonToVector3(lat, lon, radius + 0.005));
       }
-      geometries.push(new THREE.BufferGeometry().setFromPoints(points));
+      result.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material));
     }
 
-    return geometries;
+    return result;
   }, [radius]);
 
   return (
     <>
-      {lines.map((geo, i) => (
-        <line key={i} geometry={geo}>
-          <lineBasicMaterial color="#1e3a5f" transparent opacity={0.3} />
-        </line>
+      {lineObjects.map((obj, i) => (
+        <primitive key={i} object={obj} />
       ))}
     </>
   );
@@ -67,19 +64,18 @@ const CONTINENT_PATHS: [number, number][][] = [
 ];
 
 function ContinentOutlines({ radius }: { radius: number }) {
-  const geometries = useMemo(() => {
+  const lineObjects = useMemo(() => {
+    const material = new THREE.LineBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.25 });
     return CONTINENT_PATHS.map(path => {
       const points = path.map(([lat, lon]) => latLonToVector3(lat, lon, radius + 0.008));
-      return new THREE.BufferGeometry().setFromPoints(points);
+      return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
     });
   }, [radius]);
 
   return (
     <>
-      {geometries.map((geo, i) => (
-        <line key={`continent-${i}`} geometry={geo}>
-          <lineBasicMaterial color="#0ea5e9" transparent opacity={0.25} />
-        </line>
+      {lineObjects.map((obj, i) => (
+        <primitive key={`continent-${i}`} object={obj} />
       ))}
     </>
   );
