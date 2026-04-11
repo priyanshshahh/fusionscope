@@ -54,8 +54,10 @@ function EarthSphere({ radius }: { radius: number }) {
     <Sphere args={[radius, 128, 128]}>
       <meshStandardMaterial
         map={texture}
-        roughness={0.75}
-        metalness={0.05}
+        roughness={0.6}
+        metalness={0.0}
+        emissive="#1a3a5c"
+        emissiveIntensity={0.4}
       />
     </Sphere>
   );
@@ -204,9 +206,10 @@ export default function GlobeMap({ countries, activeLayers, onSelectCountry, sel
     <div className="relative w-full h-full bg-background/50 border border-border rounded-sm overflow-hidden">
       <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
         <SceneSetup />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 3, 5]} intensity={1.2} color="#ffffff" />
-        <pointLight position={[-5, -3, -5]} intensity={0.4} color="#3b82f6" />
+        <ambientLight intensity={1.2} />
+        <directionalLight position={[5, 3, 5]} intensity={1.8} color="#ffffff" />
+        <directionalLight position={[-3, 2, -4]} intensity={0.8} color="#ffffff" />
+        <pointLight position={[-5, -3, -5]} intensity={0.6} color="#6bb8ff" />
         <GlobeMesh
           countries={countries}
           activeLayers={activeLayers}
