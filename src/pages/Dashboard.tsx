@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { type CountryData, type RiskScores, CATEGORY_LABELS, getSeverityColor } from '@/data/types';
-import { countries as allCountries, alerts, feedItems, globalMetrics } from '@/data/mockData';
+import { countries as allCountriesMock, alerts as alertsMock, feedItems as feedItemsMock, globalMetrics as globalMetricsMock } from '@/data/mockData';
 import { TerminalCard } from '@/components/TerminalCard';
 import { MetricCard } from '@/components/MetricCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
@@ -8,6 +8,7 @@ import GlobeMap from '@/components/GlobeMap';
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight, Radio } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
+import { apiClient } from '@/lib/api';
 
 const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementType; color: string }[] = [
   { key: 'waterStress', label: 'Water Stress', icon: Droplets, color: '#0ea5e9' },
@@ -18,11 +19,90 @@ const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementTy
   { key: 'infrastructureDisruption', label: 'Infrastructure', icon: Wrench, color: '#a855f7' },
 ];
 
+// Helper function to convert API response to frontend format
+function convertApiCountryToFrontend(apiCountry: any): CountryData {
+  const trend = Array.from({ length: 12 }, () => 
+    Math.round(apiCountry.fusion_score + Math.random() * 10 - 5)
+  );
+  
+  return {
+    id: apiCountry.code,
+    name: apiCountry.name,
+    region: apiCountry.region,
+    lat: apiCountry.lat,
+    lon: apiCountry.lon,
+    risks: {
+      waterStress: apiCountry.risks.water_stress,
+      drought: apiCountry.risks.drought,
+      flood: apiCountry.risks.flood,
+      foodInsecurity: apiCountry.risks.food_insecurity,
+      migrationPressure: apiCountry.risks.migration_pressure,
+      infrastructureDisruption: apiCountry.risks.infrastructure_disruption,
+    },
+    fusionScore: apiCountry.fusion_score,
+    severity: apiCountry.severity,
+    summary: apiCountry.ai_summary,
+    trend,
+  };
+}
+
 // WorldMapPanel removed - using GlobeMap component instead
 export default function Dashboard() {
   const [activeLayers, setActiveLayers] = useState<Set<keyof RiskScores>>(new Set());
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
+  const [allCountries, setAllCountries] = useState<CountryData[]>(allCountriesMock);
+  const [alerts, setAlerts] = useState(alertsMock);
+  const [feedItems, setFeedItems] = useState(feedItemsMock);
+  const [globalMetrics, setGlobalMetrics] = useState(globalMetricsMock);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch countries
+        const countriesResult = await apiClient.getCountries();
+        if (countriesResult.status === 'success' && countriesResult.data) {
+          const convertedCountries = countriesResult.data.map(convertApiCountryToFrontend);
+          setAllCountries(convertedCountries);
+        }
+
+        // Fetch alerts
+        const alertsResult = await apiClient.getAlerts();
+        if (alertsResult.status === 'success' && alertsResult.data) {
+          setAlerts(alertsResult.data);
+        }
+
+        // Fetch feed
+        const feedResult = await apiClient.getFeed(6);
+        if (feedResult.status === 'success' && feedResult.data) {
+          setFeedItems(feedResult.data);
+        }
+
+        // Fetch global metrics
+        const metricsResult = await apiClient.getGlobalMetrics();
+        if (metricsResult.status === 'success' && metricsResult.data) {
+          setGlobalMetrics({
+            activeAlerts: metricsResult.data.active_alerts,
+            criticalRegions: metricsResult.data.critical_countries,
+            elevatedRegions: metricsResult.data.elevated_countries,
+            globalFusionScore: Math.round(metricsResult.data.avg_fusion_score),
+            topHotspot: metricsResult.data.top_hotspot,
+          });
+        }
+      } catch (error) {
+        console.warn('API fetch failed, using mock data:', error);
+        // Mock data is already set as default
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const toggleLayer = (key: keyof RiskScores) => {
     setActiveLayers(prev => {
@@ -34,11 +114,11 @@ export default function Dashboard() {
 
   const topCountries = useMemo(() =>
     [...allCountries].sort((a, b) => b.fusionScore - a.fusionScore).slice(0, 10),
-    []
+    [allCountries]
   );
 
-  const recentAlerts = useMemo(() => alerts.slice(0, 8), []);
-  const recentFeed = useMemo(() => feedItems.slice(0, 6), []);
+  const recentAlerts = useMemo(() => alerts.slice(0, 8), [alerts]);
+  const recentFeed = useMemo(() => feedItems.slice(0, 6), [feedItems]);
 
   const selected = selectedCountry || topCountries[0];
 
