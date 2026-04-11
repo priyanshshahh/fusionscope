@@ -47,88 +47,17 @@ function GlobeGrid({ radius }: { radius: number }) {
   );
 }
 
-// Simplified continent outlines as lat/lon paths
-const CONTINENT_PATHS: [number, number][][] = [
-  // Africa outline (simplified)
-  [[35,  -5], [37, 10], [35, 35], [30, 32], [22, 37], [12, 44], [2, 45], [-5, 40], [-12, 44], [-25, 35], [-35, 20], [-34, 18], [-30, 17], [-22, 14], [-17, 12], [-12, 14], [-5, 10], [0, 2], [3, 10], [5, -5], [5, -10], [7, -12], [10, -15], [15, -17], [20, -16], [27, -13], [32, -10], [35, -5]],
-  // Europe outline
-  [[36, -6], [38, -9], [43, -9], [48, -5], [48, 2], [51, 4], [54, 8], [57, 10], [60, 5], [60, 10], [64, 14], [70, 20], [70, 28], [65, 30], [56, 38], [50, 40], [46, 36], [45, 30], [42, 28], [40, 26], [38, 24], [36, 22], [36, -6]],
-  // Asia outline (simplified)
-  [[42, 28], [45, 35], [40, 45], [37, 50], [35, 55], [30, 60], [25, 65], [23, 70], [20, 75], [20, 80], [22, 88], [22, 100], [28, 105], [35, 105], [38, 110], [40, 115], [42, 120], [45, 130], [50, 135], [55, 135], [60, 140], [65, 150], [70, 170], [70, 150], [72, 120], [68, 80], [65, 70], [62, 60], [60, 50], [55, 42], [50, 40], [46, 36], [42, 28]],
-  // North America (simplified)
-  [[15, -90], [20, -100], [25, -100], [30, -95], [30, -85], [32, -80], [38, -76], [42, -70], [45, -65], [48, -55], [52, -56], [55, -60], [60, -65], [64, -70], [68, -75], [72, -80], [72, -95], [68, -105], [65, -140], [60, -150], [55, -130], [50, -125], [45, -124], [40, -124], [35, -120], [30, -115], [25, -110], [20, -105], [15, -90]],
-  // South America
-  [[12, -70], [10, -75], [7, -78], [2, -80], [-5, -80], [-15, -75], [-20, -70], [-25, -65], [-30, -60], [-35, -58], [-40, -63], [-45, -65], [-50, -70], [-55, -68], [-53, -70], [-46, -75], [-40, -73], [-35, -72], [-25, -70], [-18, -67], [-15, -69], [-10, -67], [-5, -60], [0, -50], [5, -52], [7, -55], [10, -62], [12, -70]],
-  // Australia
-  [[-12, 130], [-15, 125], [-20, 118], [-25, 114], [-30, 115], [-35, 117], [-38, 145], [-35, 150], [-30, 153], [-25, 153], [-20, 148], [-15, 145], [-12, 142], [-10, 135], [-12, 130]],
-];
-
-function createFilledContinent(path: [number, number][], radius: number): THREE.Mesh {
-  // Project lat/lon to 2D for triangulation, then map back to 3D sphere
-  const shape = new THREE.Shape();
-  const projected = path.map(([lat, lon]) => {
-    const x = (lon + 180) / 360;
-    const y = (lat + 90) / 180;
-    return new THREE.Vector2(x, y);
-  });
-  shape.moveTo(projected[0].x, projected[0].y);
-  for (let i = 1; i < projected.length; i++) {
-    shape.lineTo(projected[i].x, projected[i].y);
-  }
-  shape.closePath();
-
-  const shapeGeo = new THREE.ShapeGeometry(shape, 24);
-  const pos = shapeGeo.attributes.position;
-
-  // Remap each vertex from 2D shape back onto sphere surface
-  for (let i = 0; i < pos.count; i++) {
-    const u = pos.getX(i);
-    const v = pos.getY(i);
-    const lon = u * 360 - 180;
-    const lat = v * 180 - 90;
-    const vec = latLonToVector3(lat, lon, radius + 0.006);
-    pos.setXYZ(i, vec.x, vec.y, vec.z);
-  }
-  shapeGeo.computeVertexNormals();
-
-  const material = new THREE.MeshStandardMaterial({
-    color: '#0c2d48',
-    emissive: '#0a4a7a',
-    emissiveIntensity: 0.15,
-    transparent: true,
-    opacity: 0.85,
-    side: THREE.DoubleSide,
-    roughness: 0.7,
-    metalness: 0.2,
-  });
-
-  return new THREE.Mesh(shapeGeo, material);
-}
-
-function ContinentFills({ radius }: { radius: number }) {
-  const objects = useMemo(() => {
-    const edgeMaterial = new THREE.LineBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.5 });
-    const result: THREE.Object3D[] = [];
-
-    CONTINENT_PATHS.forEach(path => {
-      // Filled mesh
-      result.push(createFilledContinent(path, radius));
-
-      // Edge outline
-      const edgePoints = path.map(([lat, lon]) => latLonToVector3(lat, lon, radius + 0.009));
-      edgePoints.push(edgePoints[0]); // close loop
-      result.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints), edgeMaterial));
-    });
-
-    return result;
-  }, [radius]);
-
+function EarthSphere({ radius }: { radius: number }) {
+  const texture = useLoader(THREE.TextureLoader, '/earth-texture.jpg');
+  
   return (
-    <>
-      {objects.map((obj, i) => (
-        <primitive key={`continent-fill-${i}`} object={obj} />
-      ))}
-    </>
+    <Sphere args={[radius, 128, 128]}>
+      <meshStandardMaterial
+        map={texture}
+        roughness={0.75}
+        metalness={0.05}
+      />
+    </Sphere>
   );
 }
 
