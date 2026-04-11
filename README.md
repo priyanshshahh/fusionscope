@@ -131,11 +131,5 @@ $$Fusion Score = (0.25 \times Water) + (0.20 \times Drought) + (0.20 \times Floo
 
 ---
 
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
----
-
 **Last Updated**: April 2026  
 **Status**: ✅ Production Ready | 🚀 Deployed | 📊 Live Data | 🎯 Mission Critical
