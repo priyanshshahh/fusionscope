@@ -63,19 +63,70 @@ const CONTINENT_PATHS: [number, number][][] = [
   [[-12, 130], [-15, 125], [-20, 118], [-25, 114], [-30, 115], [-35, 117], [-38, 145], [-35, 150], [-30, 153], [-25, 153], [-20, 148], [-15, 145], [-12, 142], [-10, 135], [-12, 130]],
 ];
 
-function ContinentOutlines({ radius }: { radius: number }) {
-  const lineObjects = useMemo(() => {
-    const material = new THREE.LineBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.25 });
-    return CONTINENT_PATHS.map(path => {
-      const points = path.map(([lat, lon]) => latLonToVector3(lat, lon, radius + 0.008));
-      return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
+function createFilledContinent(path: [number, number][], radius: number): THREE.Mesh {
+  // Project lat/lon to 2D for triangulation, then map back to 3D sphere
+  const shape = new THREE.Shape();
+  const projected = path.map(([lat, lon]) => {
+    const x = (lon + 180) / 360;
+    const y = (lat + 90) / 180;
+    return new THREE.Vector2(x, y);
+  });
+  shape.moveTo(projected[0].x, projected[0].y);
+  for (let i = 1; i < projected.length; i++) {
+    shape.lineTo(projected[i].x, projected[i].y);
+  }
+  shape.closePath();
+
+  const shapeGeo = new THREE.ShapeGeometry(shape, 24);
+  const pos = shapeGeo.attributes.position;
+
+  // Remap each vertex from 2D shape back onto sphere surface
+  for (let i = 0; i < pos.count; i++) {
+    const u = pos.getX(i);
+    const v = pos.getY(i);
+    const lon = u * 360 - 180;
+    const lat = v * 180 - 90;
+    const vec = latLonToVector3(lat, lon, radius + 0.006);
+    pos.setXYZ(i, vec.x, vec.y, vec.z);
+  }
+  shapeGeo.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    color: '#0c2d48',
+    emissive: '#0a4a7a',
+    emissiveIntensity: 0.15,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+    roughness: 0.7,
+    metalness: 0.2,
+  });
+
+  return new THREE.Mesh(shapeGeo, material);
+}
+
+function ContinentFills({ radius }: { radius: number }) {
+  const objects = useMemo(() => {
+    const edgeMaterial = new THREE.LineBasicMaterial({ color: '#0ea5e9', transparent: true, opacity: 0.5 });
+    const result: THREE.Object3D[] = [];
+
+    CONTINENT_PATHS.forEach(path => {
+      // Filled mesh
+      result.push(createFilledContinent(path, radius));
+
+      // Edge outline
+      const edgePoints = path.map(([lat, lon]) => latLonToVector3(lat, lon, radius + 0.009));
+      edgePoints.push(edgePoints[0]); // close loop
+      result.push(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePoints), edgeMaterial));
     });
+
+    return result;
   }, [radius]);
 
   return (
     <>
-      {lineObjects.map((obj, i) => (
-        <primitive key={`continent-${i}`} object={obj} />
+      {objects.map((obj, i) => (
+        <primitive key={`continent-fill-${i}`} object={obj} />
       ))}
     </>
   );
