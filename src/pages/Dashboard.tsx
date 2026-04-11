@@ -4,6 +4,7 @@ import { countries as allCountries, alerts, feedItems, globalMetrics } from '@/d
 import { TerminalCard } from '@/components/TerminalCard';
 import { MetricCard } from '@/components/MetricCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
+import GlobeMap from '@/components/GlobeMap';
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight, Radio } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
@@ -17,78 +18,7 @@ const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementTy
   { key: 'infrastructureDisruption', label: 'Infrastructure', icon: Wrench, color: '#a855f7' },
 ];
 
-function WorldMapPanel({ countries: data, activeLayers, onSelectCountry, selectedCountry }: {
-  countries: CountryData[];
-  activeLayers: Set<keyof RiskScores>;
-  onSelectCountry: (c: CountryData) => void;
-  selectedCountry: string | null;
-}) {
-  // Simple projected map
-  const toX = (lon: number) => ((lon + 180) / 360) * 100;
-  const toY = (lat: number) => ((90 - lat) / 180) * 100;
-
-  return (
-    <div className="relative w-full h-full bg-background/50 border border-border rounded-sm overflow-hidden terminal-grid">
-      {/* Map background lines */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {/* Grid lines */}
-        {[20, 40, 50, 60, 80].map(y => (
-          <line key={`h${y}`} x1="0" y1={y} x2="100" y2={y} stroke="hsl(200 100% 50% / 0.05)" strokeWidth="0.15" />
-        ))}
-        {[20, 40, 50, 60, 80].map(x => (
-          <line key={`v${x}`} x1={x} y1="0" x2={x} y2="100" stroke="hsl(200 100% 50% / 0.05)" strokeWidth="0.15" />
-        ))}
-        {/* Equator */}
-        <line x1="0" y1="50" x2="100" y2="50" stroke="hsl(200 100% 50% / 0.1)" strokeWidth="0.2" strokeDasharray="1 1" />
-      </svg>
-
-      {/* Country markers */}
-      {data.map(country => {
-        const x = toX(country.lon);
-        const y = toY(country.lat);
-        const isSelected = selectedCountry === country.id;
-        const maxRisk = activeLayers.size > 0
-          ? Math.max(...Array.from(activeLayers).map(l => country.risks[l]))
-          : country.fusionScore;
-        const size = 0.6 + (maxRisk / 100) * 1.2;
-        const colorClass = country.severity === 'critical' ? '#ef4444' : country.severity === 'high' ? '#f97316' : country.severity === 'elevated' ? '#f59e0b' : '#22c55e';
-
-        return (
-          <button
-            key={country.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer z-10"
-            style={{ left: `${x}%`, top: `${y}%` }}
-            onClick={() => onSelectCountry(country)}
-          >
-            <div
-              className={`rounded-full transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}
-              style={{
-                width: `${size}rem`,
-                height: `${size}rem`,
-                backgroundColor: colorClass,
-                opacity: isSelected ? 1 : 0.7,
-                boxShadow: `0 0 ${maxRisk / 5}px ${colorClass}`,
-              }}
-            />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-card border border-border px-2 py-1 rounded-sm whitespace-nowrap z-20">
-              <span className="text-[10px] font-mono text-foreground">{country.name}</span>
-              <span className="text-[10px] font-mono text-muted-foreground ml-2">{country.fusionScore}</span>
-            </div>
-          </button>
-        );
-      })}
-
-      {/* Legend */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-3 bg-card/80 border border-border px-2 py-1 rounded-sm">
-        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-critical" /><span className="text-[9px] font-mono text-muted-foreground">Critical</span></div>
-        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-high" /><span className="text-[9px] font-mono text-muted-foreground">High</span></div>
-        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-elevated" /><span className="text-[9px] font-mono text-muted-foreground">Elevated</span></div>
-        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-low" /><span className="text-[9px] font-mono text-muted-foreground">Low</span></div>
-      </div>
-    </div>
-  );
-}
-
+// WorldMapPanel removed - using GlobeMap component instead
 export default function Dashboard() {
   const [activeLayers, setActiveLayers] = useState<Set<keyof RiskScores>>(new Set());
   const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
@@ -199,7 +129,7 @@ export default function Dashboard() {
         {/* Center - Map */}
         <div className="flex-1 flex flex-col gap-2">
           <div className="flex-1">
-            <WorldMapPanel
+            <GlobeMap
               countries={allCountries}
               activeLayers={activeLayers}
               onSelectCountry={(c) => setSelectedCountry(c)}
