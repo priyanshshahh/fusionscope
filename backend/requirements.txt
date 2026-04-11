@@ -4,3 +4,6 @@ sqlalchemy==2.0.25
 pydantic==2.6.1
 pydantic-settings==2.2.1
 python-dotenv==1.0.0
+python-multipart==0.0.6
+httpx==0.25.2
+aiofiles==23.2.1
