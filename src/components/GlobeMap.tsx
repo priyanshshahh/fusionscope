@@ -54,8 +54,10 @@ function EarthSphere({ radius }: { radius: number }) {
     <Sphere args={[radius, 128, 128]}>
       <meshStandardMaterial
         map={texture}
-        roughness={0.75}
-        metalness={0.05}
+        roughness={0.6}
+        metalness={0.0}
+        emissive="#1a3a5c"
+        emissiveIntensity={0.4}
       />
     </Sphere>
   );
