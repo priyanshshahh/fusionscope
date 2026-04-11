@@ -204,9 +204,9 @@ export default function GlobeMap({ countries, activeLayers, onSelectCountry, sel
     <div className="relative w-full h-full bg-background/50 border border-border rounded-sm overflow-hidden">
       <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
         <SceneSetup />
-        <ambientLight intensity={0.3} />
-        <pointLight position={[5, 3, 5]} intensity={0.8} color="#0ea5e9" />
-        <pointLight position={[-5, -3, -5]} intensity={0.3} color="#3b82f6" />
+        <ambientLight intensity={0.6} />
+        <directionalLight position={[5, 3, 5]} intensity={1.2} color="#ffffff" />
+        <pointLight position={[-5, -3, -5]} intensity={0.4} color="#3b82f6" />
         <GlobeMesh
           countries={countries}
           activeLayers={activeLayers}
