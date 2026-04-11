@@ -2,8 +2,7 @@
 
 A production-ready full-stack application providing real-time global crisis monitoring, risk analysis, and geopolitical intelligence through an advanced fusion algorithm.
 
-**Live Demo:** [http://localhost:8080](http://localhost:8080)  
-**API Documentation:** [http://localhost:8000/docs](http://localhost:8000/docs)  
+**Live Demo:** [[(https://fusionscope.vercel.app/)  ](https://fusionscope.vercel.app/)]
 **GitHub:** [reyanshbharatkpatel-beep/fusionscope](https://github.com/reyanshbharatkpatel-beep/fusionscope)
 
 ---
