@@ -1,0 +1,24 @@
+name: Refresh live data
+
+# Every 6 hours, ask the deployed backend to re-run the ETL pipeline.
+# Requires two repository secrets:
+#   BACKEND_URL    e.g. https://fusionscope-api.onrender.com
+#   REFRESH_TOKEN  must match the backend's REFRESH_TOKEN env var
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backend refresh
+        run: |
+          if [ -z "${{ secrets.BACKEND_URL }}" ]; then
+            echo "BACKEND_URL secret not set; skipping." && exit 0
+          fi
+          curl --fail-with-body -sS -X POST \
+            -H "X-Refresh-Token: ${{ secrets.REFRESH_TOKEN }}" \
+            "${{ secrets.BACKEND_URL }}/api/refresh" \
+            --max-time 300

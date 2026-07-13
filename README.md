@@ -1,133 +1,80 @@
+# FusionScope
 
+A global crisis-risk dashboard: six risk vectors per country (water stress,
+drought, flood, food insecurity, migration pressure, infrastructure
+fragility) fused into one weighted 0-100 instability score, rendered on an
+interactive 3D globe.
 
-# 🌍 FusionScope - Global Crisis Fusion Dashboard
+**What is real and what is not** (also on the in-app Methodology page):
 
-A production-ready full-stack application providing real-time global crisis monitoring, risk analysis, and geopolitical intelligence through an advanced fusion algorithm.
+- **Live mode** scores countries from three open, keyless APIs:
+  [World Bank indicators](https://data.worldbank.org) (water stress,
+  undernourishment, electricity access), [GDACS](https://www.gdacs.org)
+  disaster events (drought/flood, plus the alerts and feed with links to the
+  original reports), and the
+  [UNHCR Refugee Data Finder](https://api.unhcr.org) (displacement totals).
+  Vectors with no live source fall back to a curated baseline and are
+  flagged `estimated` per country.
+- **Demo mode** is a curated baseline dataset. The UI labels it `DEMO DATA`;
+  it is never presented as live measurement.
+- Country summaries are template-generated from the scores. There is no
+  satellite, sensor, or NLP pipeline, and nothing here is an AI prediction.
 
-**Live Demo:** [https://fusionscope.vercel.app/](https://fusionscope.vercel.app/)  
+## Stack
 
----
+React 18 + TypeScript + Vite + Tailwind (three.js globe, recharts) /
+FastAPI + SQLAlchemy + SQLite / httpx ETL / pytest + vitest / GitHub Actions.
 
-## ✨ Key Features
+## Run it
 
-### 🎯 Global Crisis Monitoring
-- **Real-time Dashboard**: Monitor 60+ countries with live risk metrics.
-- **Fusion Algorithm**: Proprietary scoring system combining 6 risk vectors.
-- **Risk Vectors**: Water stress, drought, flood, food insecurity, migration pressure, and infrastructure disruption.
-- **Severity Classification**: Low, Elevated, High, and Critical severity bands.
+Backend (Python 3.12+):
 
-### 📊 Rich Analytics
-- **Global Metrics**: Active alerts, critical countries count, and average fusion scores.
-- **Country Profiles**: Detailed risk breakdown for each specific country.
-- **Crisis Feeds**: Curated feed of 259+ crisis events.
-- **Alert System**: 201+ auto-generated alerts sorted by severity.
-
-### 🔗 Seamless Integration
-- **Cloud-Native Architecture**: Fully optimized for Vercel and remote API environments.
-- **Type-Safe**: TypeScript frontend + Pydantic schema validation.
-- **Production Ready**: CORS configured, error handling, and graceful degradation with automatic mock data fallback.
-
----
-
-## 🏗️ Architecture
-
-```text
-┌─────────────────────────────────────────────────────┐
-│             Vercel Hosted Frontend                  │
-│  - Dashboard, Country Detail, Alerts, Feed Pages    │
-│  - API Client with intelligent fallback              │
-└──────────────────┬──────────────────────────────────┘
-                   │
-                   │ Production API HTTPS
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│             FastAPI Production Backend              │
-│  - 7 REST Endpoints                                 │
-│  - SQLAlchemy ORM                                   │
-│  - Business Logic Services                          │
-└──────────────────┬──────────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────────┐
-│            Cloud Database (PostgreSQL)              │
-│  - 60 Global Countries                              │
-│  - 201+ Auto-generated Alerts                       │
-│  - 259+ Crisis Feed Items                           │
-│  - Real-time Global Metrics                         │
-└─────────────────────────────────────────────────────┘
+```sh
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m app.etl.refresh          # live data (or: --demo for offline)
+uvicorn app.main:app --reload      # http://localhost:8000/docs
 ```
 
----
+Frontend:
 
-## 🚀 Deployment & Environment
-
-### Frontend Configuration
-The frontend is deployed on **Vercel**. To point to the production API, ensure your environment variables are set in the Vercel dashboard:
-
-```bash
-# .env.production
-VITE_API_BASE_URL=https://api.fusionscope.app
+```sh
+npm install
+npm run dev                        # http://localhost:8080
 ```
 
-### Backend Deployment
-The FastAPI backend is designed to run in a containerized environment (Docker) or via cloud providers like Render/Railway.
+The frontend works without the backend (bundled demo data, labeled
+`OFFLINE · DEMO`). Point it at a deployed backend with
+`VITE_API_BASE_URL` (see `.env.local.example`).
 
-1. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Tests
 
-2. **Initialize Production Database**
-   ```bash
-   python -m scripts.seed
-   ```
+```sh
+cd backend && python -m pytest tests   # scoring, ETL parsers (recorded fixtures), API
+npm test                                # fusion parity, converter, provenance badges
+```
 
----
+## Data pipeline
 
-## 📦 API Endpoints (Production)
+`backend/app/etl/` — one module per source plus `scoring.py` (the fusion
+formula and all normalization mappings, mirrored in `src/data/types.ts`) and
+`refresh.py` (orchestrator). Refresh paths:
 
-### Health Check
-`GET /api/health` → `{"status":"healthy","service":"FusionScope Backend"}`
+- `python -m app.etl.refresh` locally or at deploy time
+- `POST /api/refresh` with `X-Refresh-Token` (set `REFRESH_TOKEN`)
+- `.github/workflows/refresh-data.yml` cron hits that endpoint every 6 hours
 
-### Global Metrics
-`GET /api/global-metrics` → Returns active alerts, critical counts, and average fusion scores across all tracked regions.
+Scores are point-in-time; no historical series is stored yet, so the UI
+shows trend charts only for demo data (labeled). Optional: set
+`RELIEFWEB_APPNAME` (requires [ReliefWeb approval](https://apidoc.reliefweb.int))
+to add real humanitarian report headlines to the feed.
 
-### Country Detail
-`GET /api/country/{code}` → Fetches high-resolution risk data for specific ISO codes (e.g., `SOM`, `YEM`, `AFG`).
+## Deploy
 
----
+- Backend: `render.yaml` (Render) or `backend/Dockerfile` anywhere.
+  Set `ALLOWED_ORIGINS` to the frontend origin.
+- Frontend: `vercel.json` (SPA rewrites); set `VITE_API_BASE_URL`.
+- CI: `.github/workflows/ci.yml` runs both test suites and the build.
 
-## 🧮 Fusion Algorithm
-
-The proprietary fusion score combines 6 risk dimensions with weighted importance to determine humanitarian priority:
-
-$$Fusion Score = (0.25 \times Water) + (0.20 \times Drought) + (0.20 \times Flood) + (0.15 \times Food) + (0.10 \times Migration) + (0.10 \times Infra)$$
-
-**Severity Classification:**
-- **Low**: 0-24
-- **Elevated**: 25-49
-- **High**: 50-74
-- **Critical**: 75-100
-
----
-
-## 🎨 Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Frontend** | React, TypeScript, Vite, TailwindCSS, shadcn/ui |
-| **Backend** | FastAPI, Python, SQLAlchemy, Pydantic |
-| **Database** | PostgreSQL / SQLite |
-| **Infrastructure**| Vercel, GitHub Actions (CI/CD) |
-
----
-
-## 👥 Contributors
-
-* **Priyansh Shah** — [@priyanshshahh](https://github.com/priyanshshahh)
-* **Vimarsh Khattar** — [@vimarshkhattar](https://github.com/vimarshkhattar)
-* **Reyansh Bharat Patel** — [@reyanshbharatkpatel-beep](https://github.com/reyanshbharatkpatel-beep)
-
----
-
-**Last Updated**: April 2026  
-**Status**: ✅ Production Ready | 🚀 Deployed | 📊 Live Data | 🎯 Mission Critical
+Design notes and known limitations: [docs/PROJECT-NOTES.md](docs/PROJECT-NOTES.md).

@@ -1,0 +1,21 @@
+# Render deployment for the FastAPI backend.
+# The SQLite database lives on the instance disk and is rebuilt by the
+# refresh pipeline; it is demo-seeded at build time so the service is
+# never empty. The scheduled GitHub Actions job hits POST /api/refresh
+# to swap in live-scored data.
+services:
+  - type: web
+    name: fusionscope-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python -m app.etl.refresh --demo
+    startCommand: python -m app.etl.refresh || true && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.1
+      - key: ALLOWED_ORIGINS
+        sync: false # e.g. https://your-frontend.vercel.app
+      - key: REFRESH_TOKEN
+        generateValue: true
+      - key: RELIEFWEB_APPNAME
+        sync: false # optional; requires ReliefWeb approval
