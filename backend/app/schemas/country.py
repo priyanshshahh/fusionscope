@@ -22,6 +22,8 @@ class CountryResponse(BaseModel):
     fusion_score: float
     severity: str
     ai_summary: str
+    data_source: str = "demo"  # live | demo
+    estimated_vectors: list[str] = []
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -40,6 +42,8 @@ class AlertResponse(BaseModel):
     severity: str
     summary: str
     timestamp: str
+    source: str = ""
+    source_url: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -53,6 +57,8 @@ class FeedItemResponse(BaseModel):
     urgency: str
     summary: str
     timestamp: str
+    source: str = ""
+    source_url: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -63,6 +69,8 @@ class GlobalMetricsResponse(BaseModel):
     elevated_countries: int
     avg_fusion_score: float
     top_hotspot: str
+    data_source: str = "demo"  # live | demo
+    updated_at: Optional[datetime] = None
 
 
 class SummaryResponse(BaseModel):

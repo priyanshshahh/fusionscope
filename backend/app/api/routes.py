@@ -2,8 +2,11 @@
 API routes for FusionScope backend.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.db.database import get_db
 from app.services import CountryService, AlertService, FeedService, MetricsService
 from app.schemas.country import (
@@ -20,9 +23,39 @@ router = APIRouter(prefix="/api", tags=["api"])
 
 # Health check
 @router.get("/health", tags=["health"])
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "FusionScope Backend"}
+async def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint, including data provenance."""
+    provenance = {"data_source": None, "data_updated_at": None}
+    try:
+        metrics = MetricsService.get_global_metrics(db)
+        provenance = {
+            "data_source": metrics.data_source,
+            "data_updated_at": (
+                metrics.updated_at.isoformat() if metrics.updated_at else None
+            ),
+        }
+    except Exception:
+        pass  # health should not fail because the DB is empty
+    return {"status": "healthy", "service": "FusionScope Backend", **provenance}
+
+
+# Data refresh (token-protected; used by the scheduled GitHub Actions job)
+@router.post("/refresh", tags=["admin"])
+async def refresh_data(
+    demo: bool = False, x_refresh_token: str = Header(default="")
+):
+    """Re-run the ETL pipeline. Requires REFRESH_TOKEN to be configured."""
+    if not settings.refresh_token:
+        raise HTTPException(status_code=503, detail="Refresh endpoint not configured")
+    if not hmac.compare_digest(x_refresh_token, settings.refresh_token):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    from app.etl.refresh import run_refresh
+
+    try:
+        return run_refresh(demo=demo, reliefweb_appname=settings.reliefweb_appname)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Refresh failed: {e}")
 
 
 # Global Metrics

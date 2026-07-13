@@ -42,6 +42,10 @@ class CountryService:
                     fusion_score=c.overall_fusion_score,
                     severity=c.severity,
                     ai_summary=c.ai_summary,
+                    data_source=c.data_source or "demo",
+                    estimated_vectors=(
+                        c.estimated_vectors.split(",") if c.estimated_vectors else []
+                    ),
                     updated_at=c.updated_at,
                 )
             )
@@ -71,6 +75,10 @@ class CountryService:
             fusion_score=country.overall_fusion_score,
             severity=country.severity,
             ai_summary=country.ai_summary,
+            data_source=country.data_source or "demo",
+            estimated_vectors=(
+                country.estimated_vectors.split(",") if country.estimated_vectors else []
+            ),
             updated_at=country.updated_at,
         )
 
@@ -111,6 +119,8 @@ class AlertService:
                 severity=a.severity,
                 summary=a.summary,
                 timestamp=a.timestamp,
+                source=a.source or "",
+                source_url=a.source_url or "",
             )
             for a in alerts
         ]
@@ -134,6 +144,8 @@ class AlertService:
                 severity=a.severity,
                 summary=a.summary,
                 timestamp=a.timestamp,
+                source=a.source or "",
+                source_url=a.source_url or "",
             )
             for a in alerts
         ]
@@ -161,6 +173,8 @@ class FeedService:
                 urgency=f.urgency,
                 summary=f.summary,
                 timestamp=f.timestamp,
+                source=f.source or "",
+                source_url=f.source_url or "",
             )
             for f in items
         ]
@@ -187,6 +201,8 @@ class FeedService:
                 urgency=f.urgency,
                 summary=f.summary,
                 timestamp=f.timestamp,
+                source=f.source or "",
+                source_url=f.source_url or "",
             )
             for f in items
         ]
@@ -223,6 +239,8 @@ class MetricsService:
                 elevated_countries=elevated,
                 avg_fusion_score=round(avg_fusion, 2),
                 top_hotspot=top,
+                data_source=countries[0].data_source if countries else "demo",
+                updated_at=countries[0].updated_at if countries else None,
             )
 
         return GlobalMetricsResponse(
@@ -231,4 +249,6 @@ class MetricsService:
             elevated_countries=metrics.elevated_countries,
             avg_fusion_score=metrics.avg_fusion_score,
             top_hotspot=metrics.top_hotspot,
+            data_source=metrics.data_source or "demo",
+            updated_at=metrics.updated_at,
         )

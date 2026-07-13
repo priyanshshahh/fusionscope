@@ -14,7 +14,12 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8080",
         "http://127.0.0.1:3000",
     ]
-    
+
+    # Shared secret for POST /api/refresh (disabled when empty)
+    refresh_token: str = ""
+    # Approved ReliefWeb appname (feed source disabled when empty)
+    reliefweb_appname: str = ""
+
     class Config:
         env_file = ".env"
         extra = "ignore"
@@ -34,3 +39,7 @@ if os.getenv("ALLOWED_ORIGINS"):
         for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
         if origin.strip()
     ]
+if os.getenv("REFRESH_TOKEN"):
+    settings.refresh_token = os.getenv("REFRESH_TOKEN", "")
+if os.getenv("RELIEFWEB_APPNAME"):
+    settings.reliefweb_appname = os.getenv("RELIEFWEB_APPNAME", "")

@@ -26,7 +26,11 @@ class Country(Base):
     
     # Summary
     ai_summary = Column(String)
-    
+
+    # Data provenance
+    data_source = Column(String, default="demo")  # live | demo
+    estimated_vectors = Column(String, default="")  # comma-separated vector names
+
     # Timestamp
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -42,6 +46,8 @@ class Alert(Base):
     severity = Column(String)  # low, elevated, high, critical
     summary = Column(String)
     timestamp = Column(String)
+    source = Column(String, default="")  # e.g. GDACS
+    source_url = Column(String, default="")
 
 
 class FeedItem(Base):
@@ -55,6 +61,8 @@ class FeedItem(Base):
     urgency = Column(String)  # severity equivalent for feed
     summary = Column(String)
     timestamp = Column(String)
+    source = Column(String, default="")
+    source_url = Column(String, default="")
 
 
 class GlobalMetrics(Base):
@@ -66,4 +74,5 @@ class GlobalMetrics(Base):
     elevated_countries = Column(Integer)
     avg_fusion_score = Column(Float)
     top_hotspot = Column(String)  # country code
+    data_source = Column(String, default="demo")  # live | demo
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
