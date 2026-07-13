@@ -6,9 +6,11 @@ import { MetricCard } from '@/components/MetricCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import GlobeMap from '@/components/GlobeMap';
 import { Link, useNavigate } from 'react-router-dom';
-import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight, Radio } from 'lucide-react';
+import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { apiClient } from '@/lib/api';
+import { convertApiCountryToFrontend, type DataStatus } from '@/lib/convert';
+import { DataSourceBadge } from '@/components/DataSourceBadge';
 
 const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementType; color: string }[] = [
   { key: 'waterStress', label: 'Water Stress', icon: Droplets, color: '#0ea5e9' },
@@ -19,33 +21,6 @@ const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementTy
   { key: 'infrastructureDisruption', label: 'Infrastructure', icon: Wrench, color: '#a855f7' },
 ];
 
-// Helper function to convert API response to frontend format
-function convertApiCountryToFrontend(apiCountry: any): CountryData {
-  const trend = Array.from({ length: 12 }, () => 
-    Math.round(apiCountry.fusion_score + Math.random() * 10 - 5)
-  );
-  
-  return {
-    id: apiCountry.code,
-    name: apiCountry.name,
-    region: apiCountry.region,
-    lat: apiCountry.lat,
-    lon: apiCountry.lon,
-    risks: {
-      waterStress: apiCountry.risks.water_stress,
-      drought: apiCountry.risks.drought,
-      flood: apiCountry.risks.flood,
-      foodInsecurity: apiCountry.risks.food_insecurity,
-      migrationPressure: apiCountry.risks.migration_pressure,
-      infrastructureDisruption: apiCountry.risks.infrastructure_disruption,
-    },
-    fusionScore: apiCountry.fusion_score,
-    severity: apiCountry.severity,
-    summary: apiCountry.ai_summary,
-    trend,
-  };
-}
-
 // WorldMapPanel removed - using GlobeMap component instead
 export default function Dashboard() {
   const [activeLayers, setActiveLayers] = useState<Set<keyof RiskScores>>(new Set());
@@ -55,6 +30,8 @@ export default function Dashboard() {
   const [feedItems, setFeedItems] = useState(feedItemsMock);
   const [globalMetrics, setGlobalMetrics] = useState(globalMetricsMock);
   const [loading, setLoading] = useState(true);
+  // Honest provenance: 'offline' until the API answers, then live/demo per payload
+  const [dataStatus, setDataStatus] = useState<DataStatus>('offline');
   const navigate = useNavigate();
 
   // Fetch data from API on mount
@@ -68,6 +45,9 @@ export default function Dashboard() {
         if (countriesResult.status === 'success' && countriesResult.data) {
           const convertedCountries = countriesResult.data.map(convertApiCountryToFrontend);
           setAllCountries(convertedCountries);
+          setDataStatus(convertedCountries[0]?.dataSource === 'live' ? 'live' : 'demo');
+        } else {
+          setDataStatus('offline');
         }
 
         // Fetch alerts
@@ -90,12 +70,11 @@ export default function Dashboard() {
             criticalRegions: metricsResult.data.critical_countries,
             elevatedRegions: metricsResult.data.elevated_countries,
             globalFusionScore: Math.round(metricsResult.data.avg_fusion_score),
-            topHotspot: metricsResult.data.top_hotspot,
           });
         }
       } catch (error) {
         console.warn('API fetch failed, using mock data:', error);
-        // Mock data is already set as default
+        setDataStatus('offline'); // mock data stays visible, labeled as such
       } finally {
         setLoading(false);
       }
@@ -140,10 +119,7 @@ export default function Dashboard() {
           <Link to="/alerts" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">ALERTS</Link>
           <Link to="/feed" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">FEED</Link>
           <Link to="/methodology" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">METHOD</Link>
-          <div className="flex items-center gap-1">
-            <Radio className="w-3 h-3 text-low animate-pulse-glow" />
-            <span className="text-[10px] font-mono text-low">LIVE</span>
-          </div>
+          <DataSourceBadge status={dataStatus} />
         </div>
       </div>
 
@@ -234,8 +210,14 @@ export default function Dashboard() {
             </TerminalCard>
 
             <TerminalCard title="Strategic Risk Overview" className="overflow-hidden">
+              {!selected?.trend ? (
+                <p className="text-[11px] font-mono text-muted-foreground leading-relaxed p-2">
+                  No historical series yet — live scores are point-in-time.
+                  Trend charts appear once score history accumulates.
+                </p>
+              ) : (
               <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={selected?.trend.map((v, i) => ({ month: `M${i + 1}`, score: v })) || []}>
+                <AreaChart data={selected.trend.map((v, i) => ({ month: `M${i + 1}`, score: v }))}>
                   <defs>
                     <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(200, 100%, 50%)" stopOpacity={0.3} />
@@ -248,6 +230,7 @@ export default function Dashboard() {
                   <Area type="monotone" dataKey="score" stroke="hsl(200, 100%, 50%)" fill="url(#riskGrad)" strokeWidth={1.5} />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </TerminalCard>
           </div>
         </div>
@@ -275,10 +258,15 @@ export default function Dashboard() {
             )}
           </TerminalCard>
 
-          <TerminalCard title="AI Insights" className="flex-shrink-0">
+          <TerminalCard title="Situation Summary" className="flex-shrink-0">
             <p className="text-xs text-muted-foreground leading-relaxed font-mono">
-              {selected?.summary || 'Select a country to view AI-generated intelligence summary.'}
+              {selected?.summary || 'Select a country to view its generated situation summary.'}
             </p>
+            {selected?.dataSource === 'live' && selected.estimatedVectors && selected.estimatedVectors.length > 0 && (
+              <p className="text-[10px] text-muted-foreground/70 font-mono mt-2">
+                * {selected.estimatedVectors.length} of 6 vectors estimated from baseline (no live source)
+              </p>
+            )}
           </TerminalCard>
 
           <TerminalCard title="Risk Radar" className="flex-shrink-0">

@@ -4,9 +4,11 @@ import { countries as countriesMock, alerts as alertsMock, feedItems as feedItem
 import { CATEGORY_LABELS, getSeverityColor, type CountryData } from '@/data/types';
 import { TerminalCard } from '@/components/TerminalCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { Activity, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Activity, ArrowLeft, AlertTriangle, ExternalLink } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { apiClient } from '@/lib/api';
+import { convertApiCountryToFrontend } from '@/lib/convert';
+import { DataSourceBadge } from '@/components/DataSourceBadge';
 
 const barColors: Record<string, string> = {
   waterStress: '#0ea5e9',
@@ -16,33 +18,6 @@ const barColors: Record<string, string> = {
   migrationPressure: '#f97316',
   infrastructureDisruption: '#a855f7',
 };
-
-// Helper function to convert API response to frontend format
-function convertApiCountryToFrontend(apiCountry: any): CountryData {
-  const trend = Array.from({ length: 12 }, () => 
-    Math.round(apiCountry.fusion_score + Math.random() * 10 - 5)
-  );
-  
-  return {
-    id: apiCountry.code,
-    name: apiCountry.name,
-    region: apiCountry.region,
-    lat: apiCountry.lat,
-    lon: apiCountry.lon,
-    risks: {
-      waterStress: apiCountry.risks.water_stress,
-      drought: apiCountry.risks.drought,
-      flood: apiCountry.risks.flood,
-      foodInsecurity: apiCountry.risks.food_insecurity,
-      migrationPressure: apiCountry.risks.migration_pressure,
-      infrastructureDisruption: apiCountry.risks.infrastructure_disruption,
-    },
-    fusionScore: apiCountry.fusion_score,
-    severity: apiCountry.severity,
-    summary: apiCountry.ai_summary,
-    trend,
-  };
-}
 
 export default function CountryDetail() {
   const { id } = useParams<{ id: string }>();
@@ -129,7 +104,7 @@ export default function CountryDetail() {
   }
 
   const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-  const trendData = country.trend.map((v, i) => ({ month: months[i], score: v }));
+  const trendData = (country.trend ?? []).map((v, i) => ({ month: months[i], score: v }));
   const riskBars = Object.entries(country.risks).map(([key, val]) => ({
     name: CATEGORY_LABELS[key as keyof typeof CATEGORY_LABELS],
     key,
@@ -160,6 +135,7 @@ export default function CountryDetail() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <DataSourceBadge status={country.dataSource ?? 'offline'} />
             <div className="text-right">
               <span className="text-3xl font-mono font-bold text-foreground">{country.fusionScore}</span>
               <span className="text-xs text-muted-foreground ml-1">/ 100</span>
@@ -185,9 +161,14 @@ export default function CountryDetail() {
             </ResponsiveContainer>
           </TerminalCard>
 
-          {/* AI Summary */}
-          <TerminalCard title="AI Intelligence Summary">
+          {/* Summary */}
+          <TerminalCard title="Situation Summary">
             <p className="text-xs text-muted-foreground leading-relaxed font-mono">{country.summary}</p>
+            {country.dataSource === 'live' && country.estimatedVectors && country.estimatedVectors.length > 0 && (
+              <p className="text-[10px] text-muted-foreground/70 font-mono mt-2">
+                * Estimated from baseline (no live source): {country.estimatedVectors.join(', ').replace(/_/g, ' ')}
+              </p>
+            )}
             <div className="mt-4 space-y-2">
               {Object.entries(country.risks).map(([key, val]) => (
                 <div key={key} className="flex items-center justify-between text-xs">
@@ -205,7 +186,15 @@ export default function CountryDetail() {
         </div>
 
         {/* Trend */}
-        <TerminalCard title="12-Month Fusion Score Trend">
+        {trendData.length === 0 ? (
+          <TerminalCard title="Fusion Score Trend">
+            <p className="text-xs font-mono text-muted-foreground leading-relaxed">
+              No historical series yet — live scores are point-in-time snapshots.
+              A trend chart will appear once score history accumulates across refreshes.
+            </p>
+          </TerminalCard>
+        ) : (
+        <TerminalCard title="12-Month Fusion Score Trend (demo data)">
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={trendData}>
               <defs>
@@ -221,6 +210,7 @@ export default function CountryDetail() {
             </AreaChart>
           </ResponsiveContainer>
         </TerminalCard>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           {/* Alerts */}
@@ -232,10 +222,16 @@ export default function CountryDetail() {
                   <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${getSeverityColor(alert.severity)}`} />
                   <div>
                     <p className="font-mono text-foreground text-[11px]">{alert.title}</p>
-                    <p className="text-muted-foreground text-[10px] mt-0.5">{alert.description}</p>
+                    <p className="text-muted-foreground text-[10px] mt-0.5">{alert.description ?? alert.summary}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <SeverityBadge severity={alert.severity} />
                       <span className="text-[10px] text-muted-foreground">{alert.timestamp}</span>
+                      {alert.source_url && (
+                        <a href={alert.source_url} target="_blank" rel="noopener noreferrer"
+                           className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline">
+                          {alert.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -250,11 +246,17 @@ export default function CountryDetail() {
               {countryFeed.map(item => (
                 <div key={item.id} className="py-1.5 border-b border-border last:border-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <SeverityBadge severity={item.severity} />
+                    <SeverityBadge severity={item.severity ?? item.urgency} />
                     <span className="text-[10px] text-muted-foreground font-mono">{item.timestamp}</span>
+                    {item.source_url && (
+                      <a href={item.source_url} target="_blank" rel="noopener noreferrer"
+                         className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline">
+                        {item.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
                   </div>
                   <p className="text-xs font-mono text-foreground">{item.title}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{item.body}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{item.body ?? item.summary}</p>
                 </div>
               ))}
             </div>

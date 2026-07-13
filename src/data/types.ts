@@ -19,7 +19,14 @@ export interface CountryData {
   fusionScore: number;
   severity: Severity;
   summary: string;
-  trend: number[]; // 12 months
+  /** Historical trend. Only present for demo data — the backend does not
+   * yet store time series, so live countries have no trend. */
+  trend?: number[];
+  /** Provenance: 'live' = scored from World Bank/GDACS/UNHCR data,
+   * 'demo' = curated baseline dataset. */
+  dataSource?: 'live' | 'demo';
+  /** Vectors that fell back to the curated baseline in live mode. */
+  estimatedVectors?: string[];
 }
 
 export interface Alert {

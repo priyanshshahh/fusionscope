@@ -32,9 +32,14 @@ export default function MethodologyPage() {
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Fusion Intelligence Methodology</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Fusion Methodology</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            The FusionScope Crisis Fusion Model employs a weighted convergence algorithm that synthesizes six interdependent risk vectors into a unified instability assessment. Each vector is independently scored on a 0–100 scale using satellite imagery analysis, ground-truth sensor networks, humanitarian reporting pipelines, and natural language intelligence extraction.
+            FusionScope combines six risk vectors into a single weighted instability score per country.
+            Vectors are scored 0–100 from openly published indicators: World Bank development indicators,
+            GDACS disaster events, and UNHCR displacement statistics. Where no live indicator exists for
+            a vector, the score falls back to a curated baseline and is explicitly flagged as estimated.
+            Country summaries are template-generated from the scores — there is no satellite, sensor,
+            or NLP pipeline behind this project, and any data shown in demo mode is labeled as such.
           </p>
         </div>
 
@@ -90,23 +95,33 @@ export default function MethodologyPage() {
           </div>
         </TerminalCard>
 
-        <TerminalCard title="Data Sources & Collection">
+        <TerminalCard title="Data Sources & Vector Mapping">
           <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
             <div className="p-2 border border-border rounded-sm">
-              <span className="font-mono text-foreground block mb-1">Satellite Imagery</span>
-              NDVI vegetation indices, soil moisture, surface water extent, thermal anomaly detection
+              <span className="font-mono text-foreground block mb-1">World Bank Open Data</span>
+              Water stress = ER.H2O.FWST.ZS (freshwater withdrawal as % of resources, clamped at 100).
+              Food insecurity = SN.ITK.DEFC.ZS (undernourishment %, scaled ×2.5, 40%+ maps to 100).
+              Infrastructure fragility = 100 − EG.ELC.ACCS.ZS (electricity access %) — a structural
+              proxy, not a live outage measure.
             </div>
             <div className="p-2 border border-border rounded-sm">
-              <span className="font-mono text-foreground block mb-1">Ground Sensors</span>
-              Hydrological monitoring stations, weather networks, seismic arrays, air quality monitors
+              <span className="font-mono text-foreground block mb-1">GDACS</span>
+              Drought and flood scores from active disaster events in a 180-day window:
+              Red alert → 92, Orange → 68, Green → 42, no event → curated baseline (flagged estimated).
+              Current events also drive the alerts list and intelligence feed, with links to
+              the original GDACS reports.
             </div>
             <div className="p-2 border border-border rounded-sm">
-              <span className="font-mono text-foreground block mb-1">Humanitarian Reports</span>
-              UN OCHA, WFP, UNHCR, ICRC field assessments, IPC food security classifications
+              <span className="font-mono text-foreground block mb-1">UNHCR Refugee Data Finder</span>
+              Migration pressure from total displaced persons originating per country
+              (refugees + asylum seekers + IDPs), on a log scale: 10k → 40, 1M → 80, 10M → 100.
             </div>
             <div className="p-2 border border-border rounded-sm">
-              <span className="font-mono text-foreground block mb-1">NLP Intelligence</span>
-              Open-source intelligence extraction from news, social media, government communications
+              <span className="font-mono text-foreground block mb-1">Known Limitations</span>
+              Scores are point-in-time (no historical series yet). Six vectors, three sources — several
+              vectors rely on structural proxies. ReliefWeb report headlines are integrated but disabled
+              until an approved API appname is configured. Demo mode uses a curated baseline dataset,
+              always labeled DEMO DATA in the UI.
             </div>
           </div>
         </TerminalCard>
