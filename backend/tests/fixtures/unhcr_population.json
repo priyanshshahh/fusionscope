@@ -1,0 +1,44 @@
+{
+ "items": [
+  {
+   "year": 2024,
+   "coo_id": 172,
+   "coo_name": "Somalia",
+   "coo": "SOM",
+   "coo_iso": "SOM",
+   "coa_id": "-",
+   "coa_name": "-",
+   "coa": "-",
+   "coa_iso": "-",
+   "refugees": 894120,
+   "asylum_seekers": 237183,
+   "returned_refugees": 1959,
+   "idps": 3861643,
+   "returned_idps": 290750,
+   "stateless": "0",
+   "ooc": 334,
+   "oip": "-",
+   "hst": "0"
+  },
+  {
+   "year": 2024,
+   "coo_id": 185,
+   "coo_name": "Syrian Arab Rep.",
+   "coo": "SYR",
+   "coo_iso": "SYR",
+   "coa_id": "-",
+   "coa_name": "-",
+   "coa": "-",
+   "coa_iso": "-",
+   "refugees": 5952174,
+   "asylum_seekers": 167334,
+   "returned_refugees": 512718,
+   "idps": 7408909,
+   "returned_idps": 513896,
+   "stateless": "0",
+   "ooc": 3416,
+   "oip": "-",
+   "hst": 16471143
+  }
+ ]
+}

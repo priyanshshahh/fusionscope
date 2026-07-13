@@ -1,0 +1,105 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "eventtype": "EQ",
+    "eventid": 1551528,
+    "alertlevel": "Green",
+    "name": "Earthquake in Philippines",
+    "description": "Earthquake in Philippines",
+    "iso3": "PHL",
+    "affectedcountries": [
+     {
+      "iso2": "PH",
+      "iso3": "PHL",
+      "countryname": "Philippines"
+     }
+    ],
+    "fromdate": "2026-07-13T00:54:02",
+    "todate": "2026-07-13T00:54:02",
+    "url": {
+     "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=EQ&eventid=1551528&episodeid=1717819",
+     "report": "https://www.gdacs.org/report.aspx?eventid=1551528&episodeid=1717819&eventtype=EQ",
+     "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=EQ&eventid=1551528"
+    }
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "eventtype": "EQ",
+    "eventid": 1551509,
+    "alertlevel": "Green",
+    "name": "Earthquake in China",
+    "description": "Earthquake in China",
+    "iso3": "CHN",
+    "affectedcountries": [
+     {
+      "iso2": "CN",
+      "iso3": "CHN",
+      "countryname": "China"
+     }
+    ],
+    "fromdate": "2026-07-12T21:02:12",
+    "todate": "2026-07-12T21:02:12",
+    "url": {
+     "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=EQ&eventid=1551509&episodeid=1717807",
+     "report": "https://www.gdacs.org/report.aspx?eventid=1551509&episodeid=1717807&eventtype=EQ",
+     "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=EQ&eventid=1551509"
+    }
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "eventtype": "EQ",
+    "eventid": 1551483,
+    "alertlevel": "Green",
+    "name": "Earthquake in China",
+    "description": "Earthquake in China",
+    "iso3": "CHN",
+    "affectedcountries": [
+     {
+      "iso2": "CN",
+      "iso3": "CHN",
+      "countryname": "China"
+     }
+    ],
+    "fromdate": "2026-07-12T17:03:28",
+    "todate": "2026-07-12T17:03:28",
+    "url": {
+     "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=EQ&eventid=1551483&episodeid=1717767",
+     "report": "https://www.gdacs.org/report.aspx?eventid=1551483&episodeid=1717767&eventtype=EQ",
+     "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=EQ&eventid=1551483"
+    }
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "eventtype": "EQ",
+    "eventid": 1551480,
+    "alertlevel": "Green",
+    "name": "Earthquake in New Zealand",
+    "description": "Earthquake in New Zealand",
+    "iso3": "NZL",
+    "affectedcountries": [
+     {
+      "iso2": "NZ",
+      "iso3": "NZL",
+      "countryname": "New Zealand"
+     }
+    ],
+    "fromdate": "2026-07-12T16:31:08",
+    "todate": "2026-07-12T16:31:08",
+    "url": {
+     "geometry": "https://www.gdacs.org/gdacsapi/api/polygons/getgeometry?eventtype=EQ&eventid=1551480&episodeid=1717762",
+     "report": "https://www.gdacs.org/report.aspx?eventid=1551480&episodeid=1717762&eventtype=EQ",
+     "details": "https://www.gdacs.org/gdacsapi/api/events/geteventdata?eventtype=EQ&eventid=1551480"
+    }
+   }
+  }
+ ]
+}
