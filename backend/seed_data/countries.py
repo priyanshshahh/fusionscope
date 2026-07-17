@@ -1,6 +1,6 @@
 """
 Seeded realistic demo data for FusionScope global crisis fusion dashboard.
-48 countries with climate and humanitarian risk indicators matching
+60 countries with climate and humanitarian risk indicators matching
 water stress → migration pressure → food insecurity fusion patterns.
 """
 
