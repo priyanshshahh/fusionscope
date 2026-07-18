@@ -6,6 +6,7 @@
 
 @layer base {
   :root {
+    color-scheme: dark;
     --background: 220 20% 4%;
     --foreground: 210 20% 92%;
 
@@ -22,7 +23,9 @@
     --secondary-foreground: 210 20% 85%;
 
     --muted: 220 14% 10%;
-    --muted-foreground: 215 12% 50%;
+    /* Lightened from 50% to 62% for legible contrast on the near-black bg
+       (small mono UI text uses this pervasively). */
+    --muted-foreground: 215 14% 62%;
 
     --accent: 160 100% 45%;
     --accent-foreground: 220 20% 4%;
@@ -66,6 +69,26 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+  /* Visible keyboard-focus indicator for the terminal UI (many interactive
+     elements suppress the default browser outline via the reset). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/* Respect users who ask for reduced motion: stop the infinite ambient
+   animations (radar sweep, pulsing dots/badges) and near-instant the rest. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
