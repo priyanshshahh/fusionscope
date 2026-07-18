@@ -87,3 +87,12 @@ class SummaryResponse(BaseModel):
     summary: str
     fusion_score: float
     severity: str
+
+
+class HistoryPoint(BaseModel):
+    recorded_at: datetime
+    fusion_score: float
+    severity: str
+    data_source: str
+
+    model_config = {"from_attributes": True}

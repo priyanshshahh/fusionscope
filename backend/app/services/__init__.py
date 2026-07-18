@@ -3,7 +3,7 @@ Business logic services for country and metrics data.
 """
 
 from sqlalchemy.orm import Session
-from app.models.country import Country, Alert, FeedItem, GlobalMetrics
+from app.models.country import Country, Alert, FeedItem, GlobalMetrics, ScoreHistory
 from app.schemas.country import (
     CountryResponse,
     Dimensions,
@@ -11,6 +11,7 @@ from app.schemas.country import (
     AlertResponse,
     FeedItemResponse,
     GlobalMetricsResponse,
+    HistoryPoint,
     SummaryResponse,
 )
 from app.etl.scoring import calculate_dimensions
@@ -184,6 +185,21 @@ class FeedService:
             )
             for f in items
         ]
+
+
+class HistoryService:
+    """Service for accumulated per-country score history."""
+
+    @staticmethod
+    def get_country_history(db: Session, country_code: str) -> List[HistoryPoint]:
+        """Chronological fusion-score history for one country."""
+        rows = (
+            db.query(ScoreHistory)
+            .filter(ScoreHistory.country_code == country_code)
+            .order_by(ScoreHistory.recorded_at.asc())
+            .all()
+        )
+        return [HistoryPoint.model_validate(r) for r in rows]
 
 
 class MetricsService:

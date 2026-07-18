@@ -49,6 +49,39 @@ def test_country_detail_and_404(client):
     assert client.get("/api/country/ZZZ").status_code == 404
 
 
+def test_country_exposes_inform_dimensions(client):
+    som = client.get("/api/country/som").json()
+    assert set(som["dimensions"]) == {
+        "hazard_exposure", "vulnerability", "coping_capacity",
+    }
+    for value in som["dimensions"].values():
+        assert 0 <= value <= 100
+
+
+def test_history_accumulates_and_404(client):
+    # Two demo refreshes (module fixture + auth test) should have appended
+    # at least one history point per country.
+    history = client.get("/api/history/som").json()
+    assert history
+    for point in history:
+        assert point["fusion_score"] >= 0
+        assert point["data_source"] == "demo"
+        assert "recorded_at" in point
+    assert client.get("/api/history/ZZZ").status_code == 404
+
+
+def test_refresh_reports_per_source_status(client):
+    settings.refresh_token = "secret-token"
+    response = client.post(
+        "/api/refresh?demo=true", headers={"X-Refresh-Token": "secret-token"}
+    )
+    settings.refresh_token = ""
+    body = response.json()
+    # Demo mode touches no upstream sources, so status is empty but present.
+    assert "sources" in body
+    assert body["countries"] >= 40
+
+
 def test_alerts_carry_source_fields(client):
     alerts = client.get("/api/alerts").json()
     assert alerts

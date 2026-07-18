@@ -76,3 +76,21 @@ class GlobalMetrics(Base):
     top_hotspot = Column(String)  # country code
     data_source = Column(String, default="demo")  # live | demo
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ScoreHistory(Base):
+    """Append-only fusion-score history, one row per country per refresh.
+
+    Deliberately never truncated by the refresh (unlike the countries/alerts/
+    feed/metrics tables, which are rebuilt each cycle) so real trend lines
+    accumulate over time. Powers GET /api/history/{code}.
+    """
+
+    __tablename__ = "score_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    country_code = Column(String, index=True)
+    fusion_score = Column(Float)
+    severity = Column(String)
+    data_source = Column(String)  # live | demo
+    recorded_at = Column(DateTime, index=True)

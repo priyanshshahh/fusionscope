@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.db.database import Base, SessionLocal, engine
-from app.models.country import Alert, Country, FeedItem, GlobalMetrics
+from app.models.country import Alert, Country, FeedItem, GlobalMetrics, ScoreHistory
 from app.etl import gdacs, reliefweb, unhcr, worldbank
 from app.etl.scoring import (
     VECTORS,
@@ -72,14 +72,38 @@ def build_summary(name: str, scores: dict, severity: str, fusion: float,
     return text
 
 
-def collect_live_scores(roster: list, client: httpx.Client) -> dict:
-    """Fetch all live sources. Returns {iso3: {"scores": {...}, "estimated": [...]}}."""
+def collect_live_scores(roster: list, client: httpx.Client) -> tuple:
+    """Fetch all live sources with per-source outage resilience.
+
+    Returns ({iso3: {"scores": {...}, "estimated": [...]}}, source_status).
+    If a source is down, its vectors fall back to the curated baseline for
+    every country (flagged estimated) instead of aborting the whole refresh.
+    """
     codes = [c["code"] for c in roster]
-    wb = worldbank.fetch_all(client, codes)
-    hazard_levels = gdacs.hazard_alert_levels(gdacs.fetch_hazard_events(client))
-    displacement = unhcr.fetch_displacement(
-        client, codes, year=datetime.now(timezone.utc).year - 1
-    )
+    source_status = {}
+
+    try:
+        wb = worldbank.fetch_all(client, codes)
+        source_status["worldbank"] = "ok"
+    except httpx.HTTPError:
+        wb = {}
+        source_status["worldbank"] = "unavailable"
+
+    try:
+        hazard_levels = gdacs.hazard_alert_levels(gdacs.fetch_hazard_events(client))
+        source_status["gdacs"] = "ok"
+    except httpx.HTTPError:
+        hazard_levels = {}
+        source_status["gdacs"] = "unavailable"
+
+    try:
+        displacement = unhcr.fetch_displacement(
+            client, codes, year=datetime.now(timezone.utc).year - 1
+        )
+        source_status["unhcr"] = "ok"
+    except httpx.HTTPError:
+        displacement = {}
+        source_status["unhcr"] = "unavailable"
 
     normalizers = {
         "water_stress": score_water_stress,
@@ -116,14 +140,24 @@ def collect_live_scores(roster: list, client: httpx.Client) -> dict:
             estimated.append("migration_pressure")
 
         results[code] = {"scores": scores, "estimated": estimated}
-    return results
+    return results, source_status
 
 
 def build_alerts_and_feed(roster: list, client: httpx.Client,
                           reliefweb_appname: str = "") -> tuple:
-    """Real alerts and feed items from GDACS (and ReliefWeb when enabled)."""
+    """Real alerts and feed items from GDACS (and ReliefWeb when enabled).
+
+    Returns (alerts, feed, source_status). A GDACS outage degrades to an
+    empty alerts/feed list rather than aborting the refresh.
+    """
     roster_by_code = {c["code"]: c for c in roster}
-    events = gdacs.fetch_current_events(client) + gdacs.fetch_hazard_events(client)
+    source_status = {}
+    try:
+        events = gdacs.fetch_current_events(client) + gdacs.fetch_hazard_events(client)
+        source_status["gdacs_events"] = "ok"
+    except httpx.HTTPError:
+        events = []
+        source_status["gdacs_events"] = "unavailable"
 
     alerts, feed, seen = [], [], set()
     for event in sorted(events, key=lambda e: e["from_date"], reverse=True):
@@ -164,12 +198,14 @@ def build_alerts_and_feed(roster: list, client: httpx.Client,
             )
 
     if reliefweb_appname:
+        source_status["reliefweb"] = "ok"
         for country in roster:
             try:
                 reports = reliefweb.fetch_reports(
                     client, reliefweb_appname, country["code"], country["name"]
                 )
             except httpx.HTTPError:
+                source_status["reliefweb"] = "degraded"
                 continue
             for report in reports:
                 feed.append(
@@ -181,7 +217,9 @@ def build_alerts_and_feed(roster: list, client: httpx.Client,
                         "timestamp": _readable_date(report["timestamp"]),
                     }
                 )
-    return alerts, feed
+    else:
+        source_status["reliefweb"] = "disabled"
+    return alerts, feed, source_status
 
 
 def run_refresh(demo: bool = False, reliefweb_appname: str = "") -> dict:
@@ -192,6 +230,7 @@ def run_refresh(demo: bool = False, reliefweb_appname: str = "") -> dict:
     data_source = "demo" if demo else "live"
 
     live_scores, alerts, feed = {}, [], []
+    source_status: dict = {}
     if not demo:
         transport = httpx.HTTPTransport(retries=2)
         with httpx.Client(
@@ -199,15 +238,23 @@ def run_refresh(demo: bool = False, reliefweb_appname: str = "") -> dict:
             headers={"User-Agent": "fusionscope-etl"},
             transport=transport,
         ) as client:
-            live_scores = collect_live_scores(SEED_COUNTRIES, client)
-            alerts, feed = build_alerts_and_feed(
+            live_scores, score_status = collect_live_scores(SEED_COUNTRIES, client)
+            alerts, feed, feed_status = build_alerts_and_feed(
                 SEED_COUNTRIES, client, reliefweb_appname
             )
+            source_status = {**score_status, **feed_status}
 
-    Base.metadata.drop_all(bind=engine)
+    # Create any missing tables (idempotent). We deliberately do NOT drop_all:
+    # score_history must survive across refreshes, and the current/live tables
+    # are rebuilt inside a single transaction below so readers never see an
+    # empty database mid-refresh (old rows stay visible until the commit).
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        db.query(GlobalMetrics).delete()
+        db.query(FeedItem).delete()
+        db.query(Alert).delete()
+        db.query(Country).delete()
         countries = []
         for entry in SEED_COUNTRIES:
             if demo:
@@ -278,6 +325,19 @@ def run_refresh(demo: bool = False, reliefweb_appname: str = "") -> dict:
         for item in feed:
             db.add(FeedItem(**{k: v for k, v in item.items() if k != "severity"}))
 
+        # Append-only history: one row per country per refresh, so real
+        # trend lines accumulate over time (survives future refreshes).
+        for country in countries:
+            db.add(
+                ScoreHistory(
+                    country_code=country.code,
+                    fusion_score=country.overall_fusion_score,
+                    severity=country.severity,
+                    data_source=data_source,
+                    recorded_at=now,
+                )
+            )
+
         critical = sum(1 for c in countries if c.severity == "critical")
         elevated = sum(1 for c in countries if c.severity == "elevated")
         avg_fusion = sum(c.overall_fusion_score for c in countries) / len(countries)
@@ -300,8 +360,12 @@ def run_refresh(demo: bool = False, reliefweb_appname: str = "") -> dict:
             "countries": len(countries),
             "alerts": len(alerts),
             "feed_items": len(feed),
+            "sources": source_status,
             "refreshed_at": now.isoformat(),
         }
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
