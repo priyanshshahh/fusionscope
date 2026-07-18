@@ -1,14 +1,15 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { countries as countriesMock, alerts as alertsMock, feedItems as feedItemsMock } from '@/data/mockData';
-import { CATEGORY_LABELS, getSeverityColor, type CountryData } from '@/data/types';
+import { CATEGORY_LABELS, getSeverityColor, calculateDimensions, DIMENSION_LABELS, type Dimension, type CountryData } from '@/data/types';
 import { TerminalCard } from '@/components/TerminalCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { Activity, ArrowLeft, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Activity, ArrowLeft, AlertTriangle, ExternalLink, Radio, Database } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { apiClient } from '@/lib/api';
-import { convertApiCountryToFrontend } from '@/lib/convert';
+import { apiClient, type ApiHistoryPoint } from '@/lib/api';
+import { convertApiCountryToFrontend, convertApiAlertToFrontend, convertApiFeedItemToFrontend } from '@/lib/convert';
 import { DataSourceBadge } from '@/components/DataSourceBadge';
+import { countryProvenance, CONFIDENCE_STYLE } from '@/lib/provenance';
 
 const barColors: Record<string, string> = {
   waterStress: '#0ea5e9',
@@ -24,6 +25,7 @@ export default function CountryDetail() {
   const [country, setCountry] = useState<CountryData | null>(null);
   const [countryAlerts, setCountryAlerts] = useState<any[]>([]);
   const [countryFeed, setCountryFeed] = useState<any[]>([]);
+  const [history, setHistory] = useState<ApiHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch country data from API
@@ -46,13 +48,19 @@ export default function CountryDetail() {
           // Fetch country alerts
           const alertsResult = await apiClient.getCountryAlerts(id.toUpperCase());
           if (alertsResult.status === 'success' && alertsResult.data) {
-            setCountryAlerts(alertsResult.data);
+            setCountryAlerts(alertsResult.data.map(convertApiAlertToFrontend));
           }
 
           // Fetch country feed
           const feedResult = await apiClient.getCountryFeed(id.toUpperCase());
           if (feedResult.status === 'success' && feedResult.data) {
-            setCountryFeed(feedResult.data);
+            setCountryFeed(feedResult.data.map(convertApiFeedItemToFrontend));
+          }
+
+          // Fetch accumulated score history (real trend when >= 2 points)
+          const historyResult = await apiClient.getCountryHistory(id.toUpperCase());
+          if (historyResult.status === 'success' && historyResult.data) {
+            setHistory(historyResult.data);
           }
         } else {
           // Try mock data as fallback
@@ -104,12 +112,19 @@ export default function CountryDetail() {
   }
 
   const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-  const trendData = (country.trend ?? []).map((v, i) => ({ month: months[i], score: v }));
+  const demoTrend = (country.trend ?? []).map((v, i) => ({ month: months[i], score: v }));
+  // Real accumulated history takes precedence once >= 2 snapshots exist.
+  const historyTrend = history.map(p => ({
+    month: new Date(p.recorded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    score: Math.round(p.fusion_score),
+  }));
   const riskBars = Object.entries(country.risks).map(([key, val]) => ({
     name: CATEGORY_LABELS[key as keyof typeof CATEGORY_LABELS],
     key,
     value: val,
   }));
+  const dimensions = calculateDimensions(country.risks);
+  const provenance = countryProvenance(country);
 
   return (
     <div className="min-h-screen bg-background terminal-grid">
@@ -185,32 +200,95 @@ export default function CountryDetail() {
           </TerminalCard>
         </div>
 
-        {/* Trend */}
-        {trendData.length === 0 ? (
-          <TerminalCard title="Fusion Score Trend">
-            <p className="text-xs font-mono text-muted-foreground leading-relaxed">
-              No historical series yet — live scores are point-in-time snapshots.
-              A trend chart will appear once score history accumulates across refreshes.
-            </p>
-          </TerminalCard>
-        ) : (
-        <TerminalCard title="12-Month Fusion Score Trend (demo data)">
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={trendData}>
-              <defs>
-                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(200, 100%, 50%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(200, 100%, 50%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(215, 12%, 50%)' }} axisLine={false} tickLine={false} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(215, 12%, 50%)' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: 'hsl(220, 18%, 7%)', border: '1px solid hsl(220, 16%, 14%)', fontSize: 11, fontFamily: 'JetBrains Mono' }} />
-              <Area type="monotone" dataKey="score" stroke="hsl(200, 100%, 50%)" fill="url(#trendGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+        {/* INFORM dimension breakdown */}
+        <TerminalCard title="INFORM Risk Dimensions">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {(Object.keys(dimensions) as Dimension[]).map(dim => (
+              <div key={dim} className="p-3 border border-border rounded-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-mono text-muted-foreground">{DIMENSION_LABELS[dim]}</span>
+                  <span className="text-lg font-mono font-bold text-foreground">{dimensions[dim]}</span>
+                </div>
+                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-primary/70" style={{ width: `${dimensions[dim]}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] font-mono text-muted-foreground/70 mt-3 leading-relaxed">
+            Vectors grouped under the three dimensions of the{' '}
+            <a href="https://drmkc.jrc.ec.europa.eu/inform-index" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">INFORM Risk Index (EC JRC)</a>.
+            The composite fusion score is the geometric mean of these three dimensions.
+          </p>
         </TerminalCard>
-        )}
+
+        {/* Per-vector provenance, confidence and source links */}
+        <TerminalCard title="Vector Provenance & Sources">
+          <div className="space-y-1.5">
+            {provenance.map(row => (
+              <div key={row.vector} className="flex flex-wrap items-center gap-2 p-2 border border-border rounded-sm text-xs">
+                <span className="font-mono text-foreground w-40 shrink-0">{CATEGORY_LABELS[row.vector]}</span>
+                <span className="font-mono text-foreground w-8 text-right">{row.score}</span>
+                {row.isLive ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono rounded-sm border border-low/30 bg-low/10 text-low">
+                    <Radio className="w-2.5 h-2.5" /> LIVE
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono rounded-sm border border-elevated/30 bg-elevated/10 text-elevated">
+                    <Database className="w-2.5 h-2.5" /> BASELINE
+                  </span>
+                )}
+                <span className={`px-1.5 py-0.5 text-[9px] font-mono rounded-sm border uppercase ${CONFIDENCE_STYLE[row.confidence]}`} title="live+fresh = high, live+stale = medium, baseline = low">
+                  {row.confidence} confidence
+                </span>
+                <a href={row.source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline ml-auto" title={row.source.detail}>
+                  {row.source.source} <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            ))}
+          </div>
+          {country.updatedAt && (
+            <p className="text-[10px] font-mono text-muted-foreground/70 mt-3">
+              Snapshot fetched {new Date(country.updatedAt).toLocaleString()}.
+            </p>
+          )}
+        </TerminalCard>
+
+        {/* Trend: real accumulated history preferred; demo series or an honest
+            empty state otherwise. */}
+        {(() => {
+          const isReal = historyTrend.length >= 2;
+          const trendData = isReal ? historyTrend : demoTrend;
+          if (trendData.length === 0) {
+            return (
+              <TerminalCard title="Fusion Score History">
+                <p className="text-xs font-mono text-muted-foreground leading-relaxed">
+                  {history.length === 1
+                    ? 'One snapshot recorded so far — a trend line appears once a second refresh accumulates.'
+                    : 'No historical series yet — scores are point-in-time snapshots. A trend chart will appear once score history accumulates across refreshes.'}
+                </p>
+              </TerminalCard>
+            );
+          }
+          return (
+            <TerminalCard title={isReal ? `Fusion Score History (${history.length} snapshots)` : '12-Month Fusion Score Trend (demo data)'}>
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={trendData}>
+                  <defs>
+                    <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(200, 100%, 50%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(200, 100%, 50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(215, 12%, 50%)' }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'hsl(215, 12%, 50%)' }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: 'hsl(220, 18%, 7%)', border: '1px solid hsl(220, 16%, 14%)', fontSize: 11, fontFamily: 'JetBrains Mono' }} />
+                  <Area type="monotone" dataKey="score" stroke="hsl(200, 100%, 50%)" fill="url(#trendGrad)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </TerminalCard>
+          );
+        })()}
 
         <div className="grid grid-cols-2 gap-4">
           {/* Alerts */}
@@ -222,12 +300,12 @@ export default function CountryDetail() {
                   <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${getSeverityColor(alert.severity)}`} />
                   <div>
                     <p className="font-mono text-foreground text-[11px]">{alert.title}</p>
-                    <p className="text-muted-foreground text-[10px] mt-0.5">{alert.description ?? alert.summary}</p>
+                    <p className="text-muted-foreground text-[10px] mt-0.5">{alert.description}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <SeverityBadge severity={alert.severity} />
                       <span className="text-[10px] text-muted-foreground">{alert.timestamp}</span>
-                      {alert.source_url && (
-                        <a href={alert.source_url} target="_blank" rel="noopener noreferrer"
+                      {alert.sourceUrl && (
+                        <a href={alert.sourceUrl} target="_blank" rel="noopener noreferrer"
                            className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline">
                           {alert.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
                         </a>
@@ -246,17 +324,17 @@ export default function CountryDetail() {
               {countryFeed.map(item => (
                 <div key={item.id} className="py-1.5 border-b border-border last:border-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <SeverityBadge severity={item.severity ?? item.urgency} />
+                    <SeverityBadge severity={item.severity} />
                     <span className="text-[10px] text-muted-foreground font-mono">{item.timestamp}</span>
-                    {item.source_url && (
-                      <a href={item.source_url} target="_blank" rel="noopener noreferrer"
+                    {item.sourceUrl && (
+                      <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer"
                          className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline">
                         {item.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
                       </a>
                     )}
                   </div>
                   <p className="text-xs font-mono text-foreground">{item.title}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{item.body ?? item.summary}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{item.body}</p>
                 </div>
               ))}
             </div>
