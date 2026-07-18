@@ -2,8 +2,11 @@
 
 A global crisis-risk dashboard: six risk vectors per country (water stress,
 drought, flood, food insecurity, migration pressure, infrastructure
-fragility) fused into one weighted 0-100 instability score, rendered on an
-interactive 3D globe.
+fragility), grouped under the three dimensions of the
+[INFORM Risk Index](https://drmkc.jrc.ec.europa.eu/inform-index) (Hazard &
+Exposure / Vulnerability / Lack of Coping Capacity) and fused into one 0-100
+instability score via the geometric mean of those dimensions — INFORM's own
+method — rendered on an interactive 3D globe.
 
 **What is real and what is not** (also on the in-app Methodology page):
 

@@ -54,15 +54,36 @@ is not real, and delete the claims that were never true.
   than a user system - there is exactly one machine caller (the cron
   workflow) and no user accounts.
 
+## INFORM alignment (2026-07-17)
+
+The six vectors are now grouped under the three dimensions of the INFORM Risk
+Index (EC JRC / DG ECHO), and the composite is the **geometric mean** of the
+three dimensions rather than a flat weighted average — INFORM's documented
+method, which prevents one severe dimension from being averaged away and
+requires hazard, vulnerability and lack-of-coping to coincide for high risk.
+
+- Mapping: Hazard & Exposure = drought + flood; Vulnerability = food insecurity
+  + migration pressure; Lack of Coping Capacity = water stress + infrastructure.
+- Within a dimension, the existing per-vector weights are reused (renormalized);
+  across dimensions, geometric mean. Both sides mirror this
+  (`scoring.py` / `types.ts`) with parity tests.
+- **Honest note:** switching from arithmetic to geometric mean shifts composite
+  scores *lower* (a calm dimension now drags the score down). This is expected
+  and documented on the Methodology page — it is not a regression. Measured on a
+  live run: average composite dropped from 42.7 (old formula) to ~37.8.
+
 ## Known limitations
 
-- No historical storage, so no real trends yet. The obvious next step is an
-  append-only `score_snapshots` table written on each refresh.
+- Real historical storage now exists: an append-only `score_history` table is
+  written on every refresh and exposed at `GET /api/history/{code}`. Trend
+  charts render real accumulated data once ≥2 snapshots exist, and fall back to
+  an honest empty state otherwise.
 - Three sources cover six vectors; drought/flood outside GDACS windows and
   migration for countries UNHCR lags on are baseline-estimated (flagged).
 - The curated baseline itself is hand-authored prior knowledge, useful as a
   fallback and demo, but not a measurement - which is why it is labeled
-  everywhere.
+  everywhere. It now lives in a single shared `backend/seed_data/baseline.json`
+  consumed by both the backend seed and the frontend mock (no more drift).
 - GDACS alert titles like "Earthquake in China" are terse; ReliefWeb (once
   an appname is approved) gives much richer feed content.
 - Frontend bundle is ~1.6 MB minified (three.js dominates); code-splitting
@@ -128,3 +149,40 @@ on this machine, not estimates.
   snapshot storage (per campaign spec) also needs owner AWS credentials.
   `render.yaml` and `vercel.json` are committed and ready; this is the only
   remaining blocker to a live public deployment.
+
+## Verification (2026-07-17, Campaign 3)
+
+Second hardening/feature pass. All numbers below are from real runs on this
+machine.
+
+- **Backend tests**: `python -m pytest tests -q` (Python 3.12 venv) →
+  **38 passed** (was 30): +3 net scoring tests (INFORM dimensions +
+  geometric mean), +3 API tests (dimensions, history endpoint, per-source
+  status), +2 resilience tests (source-outage fallback, append-only history).
+- **Frontend**: `npx tsc -b` clean; `npx vitest run` → **20 passed** (was
+  15/… — added INFORM dimension parity tests); `npm run build` succeeds.
+  Bundle: initial JS **763–771 kB (219–221 kB gzip)**, down from the earlier
+  1,641 kB (456 kB gzip) — the three.js globe is now a lazy `GlobeMap-*.js`
+  chunk (854 kB) loaded on demand instead of shipping in the initial payload.
+- **Live ETL refresh** (`python -m app.etl.refresh`, real World Bank / GDACS /
+  UNHCR, ReliefWeb off): `{'data_source': 'live', 'countries': 60,
+  'alerts': 101, 'feed_items': 101, 'sources': {'worldbank': 'ok',
+  'gdacs': 'ok', 'unhcr': 'ok', 'gdacs_events': 'ok',
+  'reliefweb': 'disabled'}}`. Direct DB queries after two consecutive runs:
+  - 60/60 rows `data_source='live'`; a second refresh left the count at 60
+    (delete+insert in one transaction, not append) — confirms the atomic
+    rebuild.
+  - `score_history` held **120 rows = 2 snapshots × 60 countries** (distinct
+    `recorded_at` = 2); SOM had 2 points, so a real trend line renders.
+  - Composite spread min 9 / max 80 / avg **37.8** (down from 42.7 under the
+    old arithmetic mean, as expected for the geometric mean). Severity
+    buckets: 1 critical, 6 high, 27 elevated, 26 low.
+  - Per-vector fallback counts (GDACS active-events model): drought 42/60,
+    flood 32/60, migration 29/60, food insecurity 3/60, water & infrastructure
+    0/60 — consistent with the prior pass.
+- **Source-outage resilience** (unit test, mocked): a simulated World Bank
+  outage no longer aborts the refresh — its three vectors fall back to the
+  flagged baseline for every country and `sources.worldbank == 'unavailable'`.
+- **Cron workflow**: unchanged — `refresh-data.yml` already POSTs
+  `/api/refresh`, and history now accumulates server-side automatically on
+  each refresh, so no workflow edit was needed.
