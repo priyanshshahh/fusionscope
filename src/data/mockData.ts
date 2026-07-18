@@ -1,4 +1,13 @@
 import { CountryData, Alert, FeedItem, getSeverity, calculateFusionScore, type RiskScores } from './types';
+// Single source of truth for the curated baseline — shared with the backend
+// (backend/seed_data/countries.py loads the same JSON).
+import baseline from '../../backend/seed_data/baseline.json';
+
+interface BaselineRecord {
+  code: string; name: string; region: string; lat: number; lon: number;
+  water_stress: number; drought: number; flood: number;
+  food_insecurity: number; migration_pressure: number; infrastructure_disruption: number;
+}
 
 function seededRandom(seed: number) {
   let s = seed;
@@ -12,56 +21,22 @@ const rand = seededRandom(42);
 const r = (min: number, max: number) => Math.round(min + rand() * (max - min));
 const trend12 = (base: number) => Array.from({ length: 12 }, () => Math.max(0, Math.min(100, base + r(-15, 15))));
 
-const raw: Omit<CountryData, 'fusionScore' | 'severity' | 'trend' | 'summary'>[] = [
-  { id: 'SOM', name: 'Somalia', region: 'East Africa', lat: 5.15, lon: 46.2, risks: { waterStress: 92, drought: 88, flood: 45, foodInsecurity: 95, migrationPressure: 87, infrastructureDisruption: 82 } },
-  { id: 'YEM', name: 'Yemen', region: 'Middle East', lat: 15.55, lon: 48.52, risks: { waterStress: 95, drought: 78, flood: 35, foodInsecurity: 91, migrationPressure: 72, infrastructureDisruption: 88 } },
-  { id: 'SSD', name: 'South Sudan', region: 'East Africa', lat: 6.88, lon: 31.6, risks: { waterStress: 85, drought: 82, flood: 72, foodInsecurity: 89, migrationPressure: 91, infrastructureDisruption: 78 } },
-  { id: 'AFG', name: 'Afghanistan', region: 'South Asia', lat: 33.94, lon: 67.71, risks: { waterStress: 88, drought: 85, flood: 62, foodInsecurity: 82, migrationPressure: 78, infrastructureDisruption: 91 } },
-  { id: 'ETH', name: 'Ethiopia', region: 'East Africa', lat: 9.15, lon: 40.49, risks: { waterStress: 78, drought: 82, flood: 55, foodInsecurity: 75, migrationPressure: 68, infrastructureDisruption: 62 } },
-  { id: 'SDN', name: 'Sudan', region: 'North Africa', lat: 12.86, lon: 30.22, risks: { waterStress: 82, drought: 79, flood: 68, foodInsecurity: 85, migrationPressure: 88, infrastructureDisruption: 85 } },
-  { id: 'SYR', name: 'Syria', region: 'Middle East', lat: 34.8, lon: 38.99, risks: { waterStress: 75, drought: 68, flood: 42, foodInsecurity: 72, migrationPressure: 65, infrastructureDisruption: 92 } },
-  { id: 'PAK', name: 'Pakistan', region: 'South Asia', lat: 30.38, lon: 69.35, risks: { waterStress: 72, drought: 58, flood: 88, foodInsecurity: 65, migrationPressure: 55, infrastructureDisruption: 72 } },
-  { id: 'NGA', name: 'Nigeria', region: 'West Africa', lat: 9.08, lon: 7.49, risks: { waterStress: 65, drought: 58, flood: 72, foodInsecurity: 68, migrationPressure: 62, infrastructureDisruption: 55 } },
-  { id: 'BGD', name: 'Bangladesh', region: 'South Asia', lat: 23.68, lon: 90.36, risks: { waterStress: 58, drought: 42, flood: 92, foodInsecurity: 55, migrationPressure: 48, infrastructureDisruption: 68 } },
-  { id: 'MLI', name: 'Mali', region: 'West Africa', lat: 17.57, lon: -4.0, risks: { waterStress: 78, drought: 82, flood: 38, foodInsecurity: 72, migrationPressure: 65, infrastructureDisruption: 58 } },
-  { id: 'TCD', name: 'Chad', region: 'Central Africa', lat: 15.45, lon: 18.73, risks: { waterStress: 85, drought: 78, flood: 42, foodInsecurity: 82, migrationPressure: 58, infrastructureDisruption: 72 } },
-  { id: 'MMR', name: 'Myanmar', region: 'Southeast Asia', lat: 21.91, lon: 95.96, risks: { waterStress: 52, drought: 45, flood: 78, foodInsecurity: 62, migrationPressure: 72, infrastructureDisruption: 68 } },
-  { id: 'MOZ', name: 'Mozambique', region: 'Southern Africa', lat: -18.67, lon: 35.53, risks: { waterStress: 62, drought: 55, flood: 82, foodInsecurity: 68, migrationPressure: 45, infrastructureDisruption: 72 } },
-  { id: 'HTI', name: 'Haiti', region: 'Caribbean', lat: 18.97, lon: -72.29, risks: { waterStress: 68, drought: 52, flood: 75, foodInsecurity: 78, migrationPressure: 72, infrastructureDisruption: 85 } },
-  { id: 'IRQ', name: 'Iraq', region: 'Middle East', lat: 33.22, lon: 43.68, risks: { waterStress: 82, drought: 72, flood: 48, foodInsecurity: 55, migrationPressure: 52, infrastructureDisruption: 65 } },
-  { id: 'MDG', name: 'Madagascar', region: 'East Africa', lat: -18.77, lon: 46.87, risks: { waterStress: 55, drought: 68, flood: 72, foodInsecurity: 75, migrationPressure: 32, infrastructureDisruption: 62 } },
-  { id: 'NER', name: 'Niger', region: 'West Africa', lat: 17.61, lon: 8.08, risks: { waterStress: 88, drought: 85, flood: 35, foodInsecurity: 78, migrationPressure: 55, infrastructureDisruption: 52 } },
-  { id: 'BFA', name: 'Burkina Faso', region: 'West Africa', lat: 12.24, lon: -1.56, risks: { waterStress: 72, drought: 75, flood: 42, foodInsecurity: 68, migrationPressure: 72, infrastructureDisruption: 62 } },
-  { id: 'COD', name: 'DR Congo', region: 'Central Africa', lat: -4.04, lon: 21.76, risks: { waterStress: 48, drought: 42, flood: 65, foodInsecurity: 72, migrationPressure: 78, infrastructureDisruption: 75 } },
-  { id: 'LBY', name: 'Libya', region: 'North Africa', lat: 26.34, lon: 17.23, risks: { waterStress: 85, drought: 72, flood: 28, foodInsecurity: 48, migrationPressure: 62, infrastructureDisruption: 78 } },
-  { id: 'VEN', name: 'Venezuela', region: 'South America', lat: 6.42, lon: -66.59, risks: { waterStress: 45, drought: 38, flood: 52, foodInsecurity: 72, migrationPressure: 82, infrastructureDisruption: 68 } },
-  { id: 'CMR', name: 'Cameroon', region: 'Central Africa', lat: 7.37, lon: 12.35, risks: { waterStress: 52, drought: 48, flood: 62, foodInsecurity: 58, migrationPressure: 55, infrastructureDisruption: 48 } },
-  { id: 'KEN', name: 'Kenya', region: 'East Africa', lat: -0.02, lon: 37.91, risks: { waterStress: 68, drought: 72, flood: 55, foodInsecurity: 58, migrationPressure: 42, infrastructureDisruption: 45 } },
-  { id: 'UGA', name: 'Uganda', region: 'East Africa', lat: 1.37, lon: 32.29, risks: { waterStress: 52, drought: 48, flood: 58, foodInsecurity: 55, migrationPressure: 62, infrastructureDisruption: 42 } },
-  { id: 'ZWE', name: 'Zimbabwe', region: 'Southern Africa', lat: -19.02, lon: 29.15, risks: { waterStress: 72, drought: 68, flood: 42, foodInsecurity: 75, migrationPressure: 55, infrastructureDisruption: 62 } },
-  { id: 'LKA', name: 'Sri Lanka', region: 'South Asia', lat: 7.87, lon: 80.77, risks: { waterStress: 48, drought: 42, flood: 65, foodInsecurity: 52, migrationPressure: 38, infrastructureDisruption: 45 } },
-  { id: 'GTM', name: 'Guatemala', region: 'Central America', lat: 15.78, lon: -90.23, risks: { waterStress: 52, drought: 58, flood: 62, foodInsecurity: 55, migrationPressure: 68, infrastructureDisruption: 42 } },
-  { id: 'HND', name: 'Honduras', region: 'Central America', lat: 15.2, lon: -86.24, risks: { waterStress: 48, drought: 52, flood: 72, foodInsecurity: 52, migrationPressure: 65, infrastructureDisruption: 55 } },
-  { id: 'EGY', name: 'Egypt', region: 'North Africa', lat: 26.82, lon: 30.8, risks: { waterStress: 78, drought: 62, flood: 32, foodInsecurity: 48, migrationPressure: 35, infrastructureDisruption: 38 } },
-  { id: 'JOR', name: 'Jordan', region: 'Middle East', lat: 30.59, lon: 36.24, risks: { waterStress: 92, drought: 65, flood: 22, foodInsecurity: 38, migrationPressure: 55, infrastructureDisruption: 32 } },
-  { id: 'TUN', name: 'Tunisia', region: 'North Africa', lat: 33.89, lon: 9.54, risks: { waterStress: 72, drought: 58, flood: 35, foodInsecurity: 35, migrationPressure: 42, infrastructureDisruption: 28 } },
-  { id: 'IND', name: 'India', region: 'South Asia', lat: 20.59, lon: 78.96, risks: { waterStress: 68, drought: 55, flood: 72, foodInsecurity: 42, migrationPressure: 32, infrastructureDisruption: 45 } },
-  { id: 'PHL', name: 'Philippines', region: 'Southeast Asia', lat: 12.88, lon: 121.77, risks: { waterStress: 42, drought: 35, flood: 82, foodInsecurity: 38, migrationPressure: 28, infrastructureDisruption: 55 } },
-  { id: 'IDN', name: 'Indonesia', region: 'Southeast Asia', lat: -0.79, lon: 113.92, risks: { waterStress: 45, drought: 38, flood: 75, foodInsecurity: 32, migrationPressure: 25, infrastructureDisruption: 48 } },
-  { id: 'COL', name: 'Colombia', region: 'South America', lat: 4.57, lon: -74.3, risks: { waterStress: 38, drought: 35, flood: 62, foodInsecurity: 35, migrationPressure: 55, infrastructureDisruption: 42 } },
-  { id: 'UKR', name: 'Ukraine', region: 'Europe', lat: 48.38, lon: 31.17, risks: { waterStress: 42, drought: 38, flood: 35, foodInsecurity: 45, migrationPressure: 72, infrastructureDisruption: 85 } },
-  { id: 'MRT', name: 'Mauritania', region: 'West Africa', lat: 21.01, lon: -10.94, risks: { waterStress: 82, drought: 78, flood: 28, foodInsecurity: 62, migrationPressure: 42, infrastructureDisruption: 48 } },
-  { id: 'NPL', name: 'Nepal', region: 'South Asia', lat: 28.39, lon: 84.12, risks: { waterStress: 45, drought: 42, flood: 72, foodInsecurity: 48, migrationPressure: 38, infrastructureDisruption: 52 } },
-  { id: 'TZA', name: 'Tanzania', region: 'East Africa', lat: -6.37, lon: 34.89, risks: { waterStress: 55, drought: 52, flood: 48, foodInsecurity: 52, migrationPressure: 35, infrastructureDisruption: 38 } },
-  { id: 'MWI', name: 'Malawi', region: 'Southern Africa', lat: -13.25, lon: 34.3, risks: { waterStress: 58, drought: 62, flood: 68, foodInsecurity: 72, migrationPressure: 28, infrastructureDisruption: 55 } },
-  { id: 'SEN', name: 'Senegal', region: 'West Africa', lat: 14.5, lon: -14.45, risks: { waterStress: 62, drought: 55, flood: 42, foodInsecurity: 42, migrationPressure: 48, infrastructureDisruption: 35 } },
-  { id: 'DJI', name: 'Djibouti', region: 'East Africa', lat: 11.59, lon: 43.15, risks: { waterStress: 88, drought: 82, flood: 32, foodInsecurity: 58, migrationPressure: 55, infrastructureDisruption: 45 } },
-  { id: 'ERI', name: 'Eritrea', region: 'East Africa', lat: 15.18, lon: 39.78, risks: { waterStress: 78, drought: 75, flood: 28, foodInsecurity: 68, migrationPressure: 72, infrastructureDisruption: 65 } },
-  { id: 'CAF', name: 'Central African Republic', region: 'Central Africa', lat: 6.61, lon: 20.94, risks: { waterStress: 52, drought: 48, flood: 55, foodInsecurity: 78, migrationPressure: 75, infrastructureDisruption: 82 } },
-  { id: 'LBN', name: 'Lebanon', region: 'Middle East', lat: 33.85, lon: 35.86, risks: { waterStress: 62, drought: 45, flood: 38, foodInsecurity: 55, migrationPressure: 58, infrastructureDisruption: 72 } },
-  { id: 'AGO', name: 'Angola', region: 'Southern Africa', lat: -11.2, lon: 17.87, risks: { waterStress: 55, drought: 52, flood: 48, foodInsecurity: 55, migrationPressure: 32, infrastructureDisruption: 45 } },
-  { id: 'PRY', name: 'Paraguay', region: 'South America', lat: -23.44, lon: -58.44, risks: { waterStress: 42, drought: 48, flood: 55, foodInsecurity: 32, migrationPressure: 22, infrastructureDisruption: 35 } },
-];
+const raw: Omit<CountryData, 'fusionScore' | 'severity' | 'trend' | 'summary'>[] =
+  (baseline as BaselineRecord[]).map(c => ({
+    id: c.code,
+    name: c.name,
+    region: c.region,
+    lat: c.lat,
+    lon: c.lon,
+    risks: {
+      waterStress: c.water_stress,
+      drought: c.drought,
+      flood: c.flood,
+      foodInsecurity: c.food_insecurity,
+      migrationPressure: c.migration_pressure,
+      infrastructureDisruption: c.infrastructure_disruption,
+    },
+  }));
 
 // Composite scoring lives in types.ts (calculateFusionScore) — the single
 // frontend mirror of backend/app/etl/scoring.py.
