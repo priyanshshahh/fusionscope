@@ -27,6 +27,8 @@ export interface CountryData {
   dataSource?: 'live' | 'demo';
   /** Vectors that fell back to the curated baseline in live mode. */
   estimatedVectors?: string[];
+  /** ISO timestamp of the refresh that produced these scores. */
+  updatedAt?: string;
 }
 
 export interface Alert {
@@ -38,6 +40,9 @@ export interface Alert {
   title: string;
   description: string;
   timestamp: string;
+  /** Provenance (present on API-sourced alerts). */
+  source?: string;
+  sourceUrl?: string;
 }
 
 export interface FeedItem {
@@ -50,6 +55,9 @@ export interface FeedItem {
   body: string;
   timestamp: string;
   tags: string[];
+  /** Provenance (present on API-sourced feed items). */
+  source?: string;
+  sourceUrl?: string;
 }
 
 export const CATEGORY_LABELS: Record<keyof RiskScores, string> = {
@@ -69,6 +77,44 @@ export const RISK_WEIGHTS: Record<keyof RiskScores, number> = {
   migrationPressure: 0.10,
   infrastructureDisruption: 0.10,
 };
+
+/** INFORM Risk Index dimension key. */
+export type Dimension = 'hazardExposure' | 'vulnerability' | 'copingCapacity';
+
+/** INFORM dimensions -> the FusionScope vectors that populate them.
+ * Mirrors DIMENSIONS in backend/app/etl/scoring.py. */
+export const DIMENSIONS: Record<Dimension, (keyof RiskScores)[]> = {
+  hazardExposure: ['drought', 'flood'],
+  vulnerability: ['foodInsecurity', 'migrationPressure'],
+  copingCapacity: ['waterStress', 'infrastructureDisruption'],
+};
+
+export const DIMENSION_LABELS: Record<Dimension, string> = {
+  hazardExposure: 'Hazard & Exposure',
+  vulnerability: 'Vulnerability',
+  copingCapacity: 'Lack of Coping Capacity',
+};
+
+/** Weighted mean of each dimension's member vectors (weights renormalized
+ * within the dimension). Mirrors calculate_dimensions in scoring.py. */
+export function calculateDimensions(risks: RiskScores): Record<Dimension, number> {
+  const out = {} as Record<Dimension, number>;
+  (Object.keys(DIMENSIONS) as Dimension[]).forEach(dim => {
+    const members = DIMENSIONS[dim];
+    const totalWeight = members.reduce((s, v) => s + RISK_WEIGHTS[v], 0);
+    const weighted = members.reduce((s, v) => s + risks[v] * RISK_WEIGHTS[v], 0);
+    out[dim] = Math.round(weighted / totalWeight);
+  });
+  return out;
+}
+
+/** Composite fusion score: geometric mean of the three INFORM dimensions.
+ * Mirrors calculate_fusion_score in scoring.py. */
+export function calculateFusionScore(risks: RiskScores): number {
+  const dims = calculateDimensions(risks);
+  const product = Object.values(dims).reduce((p, v) => p * v, 1);
+  return Math.round(Math.cbrt(product));
+}
 
 export function getSeverity(score: number): Severity {
   if (score >= 75) return 'critical';

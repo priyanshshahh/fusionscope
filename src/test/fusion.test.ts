@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { RISK_WEIGHTS, getSeverity } from '@/data/types';
+import { RISK_WEIGHTS, DIMENSIONS, getSeverity, calculateDimensions, calculateFusionScore } from '@/data/types';
 import { convertApiCountryToFrontend } from '@/lib/convert';
 
 // These mirror backend/app/etl/scoring.py — if one side changes, both must.
@@ -27,6 +27,39 @@ describe('fusion formula parity with backend', () => {
     [75, 'critical'], [100, 'critical'],
   ] as const)('severity band: %i -> %s', (score, expected) => {
     expect(getSeverity(score)).toBe(expected);
+  });
+});
+
+describe('INFORM dimension aggregation parity with backend', () => {
+  const risks = {
+    waterStress: 80, drought: 60, flood: 40,
+    foodInsecurity: 100, migrationPressure: 50, infrastructureDisruption: 30,
+  };
+
+  it('groups all six vectors across the three dimensions once', () => {
+    const grouped = Object.values(DIMENSIONS).flat().sort();
+    expect(grouped).toEqual(Object.keys(RISK_WEIGHTS).sort());
+  });
+
+  it('computes each dimension as a weighted mean of its members', () => {
+    const dims = calculateDimensions(risks);
+    expect(dims.hazardExposure).toBe(50);   // (60+40)/2
+    expect(dims.vulnerability).toBe(80);     // (100*.15 + 50*.10)/.25
+    expect(dims.copingCapacity).toBe(66);    // (80*.25 + 30*.10)/.35
+  });
+
+  it('composites via geometric mean of the dimensions', () => {
+    // cbrt(50 * 80 * 66) ~= 64.16 -> 64
+    expect(calculateFusionScore(risks)).toBe(64);
+  });
+
+  it('lets a near-zero dimension pull the composite down sharply', () => {
+    const balanced = {
+      waterStress: 60, drought: 60, flood: 60,
+      foodInsecurity: 60, migrationPressure: 60, infrastructureDisruption: 60,
+    };
+    expect(calculateFusionScore(balanced)).toBe(60);
+    expect(calculateFusionScore({ ...balanced, drought: 0, flood: 0 })).toBe(0);
   });
 });
 

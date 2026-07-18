@@ -12,6 +12,13 @@ class RiskScores(BaseModel):
     infrastructure_disruption: int
 
 
+class Dimensions(BaseModel):
+    """INFORM Risk Index dimension scores (0-100), derived from the vectors."""
+    hazard_exposure: int
+    vulnerability: int
+    coping_capacity: int
+
+
 class CountryResponse(BaseModel):
     code: str
     name: str
@@ -19,6 +26,7 @@ class CountryResponse(BaseModel):
     lat: float
     lon: float
     risks: RiskScores
+    dimensions: Dimensions
     fusion_score: float
     severity: str
     ai_summary: str

@@ -2,7 +2,8 @@
 
 This module is the single source of truth for the fusion formula on the
 backend. The frontend mirror lives in src/data/types.ts (RISK_WEIGHTS,
-getSeverity) and is covered by tests on both sides to keep them in sync.
+DIMENSIONS, getSeverity, calculateFusionScore) and is covered by tests on
+both sides to keep them in sync.
 
 Normalization choices (documented in the Methodology page and README):
 
@@ -21,6 +22,21 @@ Normalization choices (documented in the Methodology page and README):
   Red -> 92, Orange -> 68, Green -> 42; no active event -> None
   (caller falls back to the curated baseline and flags the vector
   as estimated).
+
+Aggregation (INFORM-aligned, see docs and the Methodology page):
+
+The six vectors are grouped under the three dimensions of the INFORM Risk
+Index (EC Joint Research Centre / DG ECHO):
+
+  Hazard & Exposure       = drought, flood
+  Vulnerability           = food_insecurity, migration_pressure
+  Lack of Coping Capacity = water_stress, infrastructure_disruption
+
+Each dimension is a weighted mean of its member vectors (the per-vector
+weights below, renormalized within the dimension). The composite fusion
+score is the *geometric* mean of the three dimension scores, matching
+INFORM's method: risk requires all three dimensions to be present, so a
+country cannot average away one severe dimension with two calm ones.
 """
 
 from math import log10
@@ -36,6 +52,19 @@ WEIGHTS = {
 
 VECTORS = list(WEIGHTS.keys())
 
+# INFORM Risk Index dimensions -> the FusionScope vectors that populate them.
+DIMENSIONS = {
+    "hazard_exposure": ["drought", "flood"],
+    "vulnerability": ["food_insecurity", "migration_pressure"],
+    "coping_capacity": ["water_stress", "infrastructure_disruption"],
+}
+
+DIMENSION_LABELS = {
+    "hazard_exposure": "Hazard & Exposure",
+    "vulnerability": "Vulnerability",
+    "coping_capacity": "Lack of Coping Capacity",
+}
+
 GDACS_ALERT_SCORES = {"red": 92, "orange": 68, "green": 42}
 
 
@@ -44,9 +73,34 @@ def clamp_score(value: float) -> int:
     return int(round(min(100.0, max(0.0, value))))
 
 
+def calculate_dimensions(scores: dict) -> dict:
+    """Aggregate the six vectors into the three INFORM dimension scores.
+
+    Each dimension is the weighted mean of its member vectors, using the
+    per-vector WEIGHTS renormalized within the dimension. Returns a dict
+    of {dimension: rounded 0-100 score}.
+    """
+    result = {}
+    for dimension, members in DIMENSIONS.items():
+        total_weight = sum(WEIGHTS[v] for v in members)
+        weighted = sum(scores[v] * WEIGHTS[v] for v in members)
+        result[dimension] = round(weighted / total_weight)
+    return result
+
+
 def calculate_fusion_score(scores: dict) -> float:
-    """Weighted fusion score from a dict of the six vector scores."""
-    return round(sum(scores[vector] * weight for vector, weight in WEIGHTS.items()))
+    """Composite score: geometric mean of the three INFORM dimensions.
+
+    Geometric mean (INFORM's approach) means a single severe dimension is
+    not diluted by two calm ones; conversely a dimension near zero pulls the
+    composite down sharply, since disaster risk requires hazard, vulnerability
+    and lack of coping capacity to coincide.
+    """
+    dims = calculate_dimensions(scores)
+    product = 1.0
+    for value in dims.values():
+        product *= value
+    return round(product ** (1.0 / 3.0))
 
 
 def get_severity(score: float) -> str:

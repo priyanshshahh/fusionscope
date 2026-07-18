@@ -1,4 +1,4 @@
-import { CountryData, Alert, FeedItem, getSeverity, type RiskScores } from './types';
+import { CountryData, Alert, FeedItem, getSeverity, calculateFusionScore, type RiskScores } from './types';
 
 function seededRandom(seed: number) {
   let s = seed;
@@ -63,16 +63,8 @@ const raw: Omit<CountryData, 'fusionScore' | 'severity' | 'trend' | 'summary'>[]
   { id: 'PRY', name: 'Paraguay', region: 'South America', lat: -23.44, lon: -58.44, risks: { waterStress: 42, drought: 48, flood: 55, foodInsecurity: 32, migrationPressure: 22, infrastructureDisruption: 35 } },
 ];
 
-function computeFusion(risks: RiskScores): number {
-  return Math.round(
-    risks.waterStress * 0.25 +
-    risks.drought * 0.20 +
-    risks.flood * 0.20 +
-    risks.foodInsecurity * 0.15 +
-    risks.migrationPressure * 0.10 +
-    risks.infrastructureDisruption * 0.10
-  );
-}
+// Composite scoring lives in types.ts (calculateFusionScore) — the single
+// frontend mirror of backend/app/etl/scoring.py.
 
 function generateSummary(c: typeof raw[0], fusion: number): string {
   const sev = getSeverity(fusion);
@@ -86,7 +78,7 @@ function generateSummary(c: typeof raw[0], fusion: number): string {
 }
 
 export const countries: CountryData[] = raw.map(c => {
-  const fusion = computeFusion(c.risks);
+  const fusion = calculateFusionScore(c.risks);
   return {
     ...c,
     fusionScore: fusion,

@@ -6,13 +6,44 @@ from sqlalchemy.orm import Session
 from app.models.country import Country, Alert, FeedItem, GlobalMetrics
 from app.schemas.country import (
     CountryResponse,
+    Dimensions,
     RiskScores,
     AlertResponse,
     FeedItemResponse,
     GlobalMetricsResponse,
     SummaryResponse,
 )
+from app.etl.scoring import calculate_dimensions
 from typing import List
+
+
+def _country_to_response(c: Country) -> CountryResponse:
+    """Map a Country row to its API response, deriving INFORM dimensions."""
+    scores = {
+        "water_stress": c.water_stress_score,
+        "drought": c.drought_score,
+        "flood": c.flood_score,
+        "food_insecurity": c.food_insecurity_score,
+        "migration_pressure": c.migration_pressure_score,
+        "infrastructure_disruption": c.infrastructure_disruption_score,
+    }
+    return CountryResponse(
+        code=c.code,
+        name=c.name,
+        region=c.region,
+        lat=c.lat,
+        lon=c.lon,
+        risks=RiskScores(**scores),
+        dimensions=Dimensions(**calculate_dimensions(scores)),
+        fusion_score=c.overall_fusion_score,
+        severity=c.severity,
+        ai_summary=c.ai_summary,
+        data_source=c.data_source or "demo",
+        estimated_vectors=(
+            c.estimated_vectors.split(",") if c.estimated_vectors else []
+        ),
+        updated_at=c.updated_at,
+    )
 
 
 class CountryService:
@@ -21,66 +52,13 @@ class CountryService:
     @staticmethod
     def get_all_countries(db: Session) -> List[CountryResponse]:
         """Get all countries with their risk profiles."""
-        countries = db.query(Country).all()
-        result = []
-        for c in countries:
-            result.append(
-                CountryResponse(
-                    code=c.code,
-                    name=c.name,
-                    region=c.region,
-                    lat=c.lat,
-                    lon=c.lon,
-                    risks=RiskScores(
-                        water_stress=c.water_stress_score,
-                        drought=c.drought_score,
-                        flood=c.flood_score,
-                        food_insecurity=c.food_insecurity_score,
-                        migration_pressure=c.migration_pressure_score,
-                        infrastructure_disruption=c.infrastructure_disruption_score,
-                    ),
-                    fusion_score=c.overall_fusion_score,
-                    severity=c.severity,
-                    ai_summary=c.ai_summary,
-                    data_source=c.data_source or "demo",
-                    estimated_vectors=(
-                        c.estimated_vectors.split(",") if c.estimated_vectors else []
-                    ),
-                    updated_at=c.updated_at,
-                )
-            )
-        return result
+        return [_country_to_response(c) for c in db.query(Country).all()]
 
     @staticmethod
     def get_country_by_code(db: Session, code: str) -> CountryResponse | None:
         """Get a specific country by code."""
         country = db.query(Country).filter(Country.code == code).first()
-        if not country:
-            return None
-
-        return CountryResponse(
-            code=country.code,
-            name=country.name,
-            region=country.region,
-            lat=country.lat,
-            lon=country.lon,
-            risks=RiskScores(
-                water_stress=country.water_stress_score,
-                drought=country.drought_score,
-                flood=country.flood_score,
-                food_insecurity=country.food_insecurity_score,
-                migration_pressure=country.migration_pressure_score,
-                infrastructure_disruption=country.infrastructure_disruption_score,
-            ),
-            fusion_score=country.overall_fusion_score,
-            severity=country.severity,
-            ai_summary=country.ai_summary,
-            data_source=country.data_source or "demo",
-            estimated_vectors=(
-                country.estimated_vectors.split(",") if country.estimated_vectors else []
-            ),
-            updated_at=country.updated_at,
-        )
+        return _country_to_response(country) if country else None
 
     @staticmethod
     def get_country_summary(db: Session, code: str) -> SummaryResponse | None:

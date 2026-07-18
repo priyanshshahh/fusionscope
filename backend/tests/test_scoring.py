@@ -7,7 +7,9 @@ The frontend mirrors WEIGHTS and the severity bands in src/data/types.ts
 import pytest
 
 from app.etl.scoring import (
+    DIMENSIONS,
     WEIGHTS,
+    calculate_dimensions,
     calculate_fusion_score,
     clamp_score,
     get_severity,
@@ -23,7 +25,12 @@ def test_weights_sum_to_one():
     assert sum(WEIGHTS.values()) == pytest.approx(1.0)
 
 
-def test_fusion_score_matches_hand_computation():
+def test_dimensions_cover_every_vector_once():
+    grouped = [v for members in DIMENSIONS.values() for v in members]
+    assert sorted(grouped) == sorted(WEIGHTS)
+
+
+def test_dimensions_are_weighted_means_within_group():
     scores = {
         "water_stress": 80,
         "drought": 60,
@@ -32,8 +39,34 @@ def test_fusion_score_matches_hand_computation():
         "migration_pressure": 50,
         "infrastructure_disruption": 30,
     }
-    expected = 80 * 0.25 + 60 * 0.20 + 40 * 0.20 + 100 * 0.15 + 50 * 0.10 + 30 * 0.10
-    assert calculate_fusion_score(scores) == round(expected)
+    dims = calculate_dimensions(scores)
+    # hazard = (60*0.20 + 40*0.20) / 0.40 = 50
+    assert dims["hazard_exposure"] == 50
+    # vulnerability = (100*0.15 + 50*0.10) / 0.25 = 80
+    assert dims["vulnerability"] == 80
+    # coping = (80*0.25 + 30*0.10) / 0.35 = 65.71 -> 66
+    assert dims["coping_capacity"] == 66
+
+
+def test_fusion_score_is_geometric_mean_of_dimensions():
+    scores = {
+        "water_stress": 80,
+        "drought": 60,
+        "flood": 40,
+        "food_insecurity": 100,
+        "migration_pressure": 50,
+        "infrastructure_disruption": 30,
+    }
+    # geometric mean of (50, 80, 66) = (264000) ** (1/3) ~= 64.16 -> 64
+    assert calculate_fusion_score(scores) == 64
+
+
+def test_fusion_score_penalizes_a_near_zero_dimension():
+    """A calm dimension pulls the geometric mean below the arithmetic mean."""
+    balanced = {v: 60 for v in WEIGHTS}
+    lopsided = {**balanced, "drought": 0, "flood": 0}  # hazard dimension -> 0
+    assert calculate_fusion_score(balanced) == 60
+    assert calculate_fusion_score(lopsided) == 0
 
 
 @pytest.mark.parametrize(
