@@ -54,16 +54,19 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="relative z-20 max-w-7xl mx-auto px-6 pt-32 pb-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 border border-primary/30 rounded-full bg-primary/5 mb-6">
-          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-glow" />
-          <span className="text-xs font-mono text-primary">INTELLIGENCE SYSTEM ACTIVE</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+          <span className="text-xs font-mono text-primary">OPEN-DATA CRISIS INDEX · INFORM-ALIGNED</span>
         </div>
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground mb-4 text-glow-primary">
           Global Crisis Fusion
           <br />
-          <span className="text-primary">Intelligence</span>
+          <span className="text-primary">Index</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          AI-powered convergence analysis tracking how climate shocks, water stress, and environmental disruption propagate into geopolitical and humanitarian crises in real-time.
+          Six climate and humanitarian risk vectors, grouped under the INFORM Risk
+          Index dimensions and scored from openly published World Bank, GDACS and
+          UNHCR data. Point-in-time snapshots, with live-or-baseline provenance
+          labeled on every value — no forecasts, no black box.
         </p>
         <Link
           to="/dashboard"
@@ -78,9 +81,9 @@ export default function LandingPage() {
       <section className="relative z-20 max-w-7xl mx-auto px-6 pb-16">
         <div className="grid grid-cols-3 gap-4 max-w-xl mx-auto">
           {[
-            { icon: Globe, label: 'Countries Monitored', value: '48' },
+            { icon: Globe, label: 'Countries', value: '60' },
             { icon: Shield, label: 'Risk Vectors', value: '6' },
-            { icon: Zap, label: 'Fusion Indicators', value: '288' },
+            { icon: Zap, label: 'Data Sources', value: '3' },
           ].map(s => (
             <div key={s.label} className="flex flex-col items-center gap-1 p-4 border border-border rounded-sm bg-card/50">
               <s.icon className="w-4 h-4 text-primary mb-1" />
@@ -95,7 +98,7 @@ export default function LandingPage() {
       <section className="relative z-20 max-w-7xl mx-auto px-6 pb-20">
         <div className="text-center mb-10">
           <h2 className="text-2xl font-bold text-foreground mb-2">Crisis Fusion Vectors</h2>
-          <p className="text-sm text-muted-foreground">Six interdependent risk domains analyzed through convergent intelligence methodology</p>
+          <p className="text-sm text-muted-foreground">Six risk domains grouped under the INFORM Risk Index's three dimensions</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {crisisCards.map(card => (
@@ -115,7 +118,7 @@ export default function LandingPage() {
         <div className="border border-border rounded-sm bg-card p-8">
           <h2 className="text-lg font-mono font-bold text-foreground mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            FUSION INTELLIGENCE MODEL
+            FUSION SCORING MODEL
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
             <div className="space-y-2">

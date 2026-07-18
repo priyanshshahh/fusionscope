@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { apiClient } from '@/lib/api';
-import { convertApiCountryToFrontend, type DataStatus } from '@/lib/convert';
+import { convertApiCountryToFrontend, convertApiAlertToFrontend, convertApiFeedItemToFrontend, type DataStatus } from '@/lib/convert';
 import { DataSourceBadge } from '@/components/DataSourceBadge';
 
 const layerConfig: { key: keyof RiskScores; label: string; icon: React.ElementType; color: string }[] = [
@@ -53,13 +53,13 @@ export default function Dashboard() {
         // Fetch alerts
         const alertsResult = await apiClient.getAlerts();
         if (alertsResult.status === 'success' && alertsResult.data) {
-          setAlerts(alertsResult.data);
+          setAlerts(alertsResult.data.map(convertApiAlertToFrontend));
         }
 
         // Fetch feed
         const feedResult = await apiClient.getFeed(6);
         if (feedResult.status === 'success' && feedResult.data) {
-          setFeedItems(feedResult.data);
+          setFeedItems(feedResult.data.map(convertApiFeedItemToFrontend));
         }
 
         // Fetch global metrics

@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { feedItems } from '@/data/mockData';
-import { CATEGORY_LABELS, type Severity, type RiskScores } from '@/data/types';
+import { feedItems as feedItemsMock } from '@/data/mockData';
+import { CATEGORY_LABELS, type Severity, type RiskScores, type FeedItem } from '@/data/types';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { Activity, Rss, Filter } from 'lucide-react';
+import { DataSourceBadge } from '@/components/DataSourceBadge';
+import { apiClient } from '@/lib/api';
+import { convertApiFeedItemToFrontend, type DataStatus } from '@/lib/convert';
+import { Activity, Rss, Filter, ExternalLink } from 'lucide-react';
 
 const severities: Severity[] = ['critical', 'high', 'elevated', 'low'];
 const categories: (keyof RiskScores)[] = ['waterStress', 'drought', 'flood', 'foodInsecurity', 'migrationPressure', 'infrastructureDisruption'];
@@ -11,6 +14,28 @@ const categories: (keyof RiskScores)[] = ['waterStress', 'drought', 'flood', 'fo
 export default function FeedPage() {
   const [sevFilter, setSevFilter] = useState<Severity | 'all'>('all');
   const [catFilter, setCatFilter] = useState<keyof RiskScores | 'all'>('all');
+  const [feedItems, setFeedItems] = useState<FeedItem[]>(feedItemsMock);
+  const [dataStatus, setDataStatus] = useState<DataStatus>('offline');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [feedResult, metricsResult] = await Promise.all([
+        apiClient.getFeed(200),
+        apiClient.getGlobalMetrics(),
+      ]);
+      if (feedResult.status === 'success' && feedResult.data) {
+        setFeedItems(feedResult.data.map(convertApiFeedItemToFrontend));
+        const source = metricsResult.data?.data_source;
+        setDataStatus(source === 'live' ? 'live' : 'demo');
+      } else {
+        setDataStatus('offline'); // bundled mock stays visible, labeled as such
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   const filtered = useMemo(() => {
     return feedItems.filter(f => {
@@ -18,7 +43,7 @@ export default function FeedPage() {
       if (catFilter !== 'all' && f.category !== catFilter) return false;
       return true;
     });
-  }, [sevFilter, catFilter]);
+  }, [feedItems, sevFilter, catFilter]);
 
   return (
     <div className="min-h-screen bg-background terminal-grid">
@@ -27,6 +52,7 @@ export default function FeedPage() {
         <Link to="/" className="font-mono font-bold text-xs tracking-wider text-foreground hover:text-primary transition-colors">FUSIONSCOPE</Link>
         <span className="text-muted-foreground font-mono text-[10px]">/ GLOBAL FEED</span>
         <div className="flex-1" />
+        <DataSourceBadge status={dataStatus} />
         <Link to="/dashboard" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">DASHBOARD</Link>
         <Link to="/alerts" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">ALERTS</Link>
       </div>
@@ -61,12 +87,18 @@ export default function FeedPage() {
         </div>
 
         {/* Feed grid */}
+        {loading && <p className="text-xs font-mono text-muted-foreground p-4">Loading feed…</p>}
+        {!loading && filtered.length === 0 && (
+          <p className="text-xs font-mono text-muted-foreground p-4 border border-border rounded-sm bg-card">
+            No feed items match the current filters.
+          </p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {filtered.map(item => (
             <div key={item.id} className="p-3 border border-border rounded-sm bg-card hover:border-primary/20 transition-all">
               <div className="flex items-center gap-2 mb-2">
                 <SeverityBadge severity={item.severity} />
-                <span className="text-[10px] font-mono text-muted-foreground">{CATEGORY_LABELS[item.category]}</span>
+                <span className="text-[10px] font-mono text-muted-foreground">{CATEGORY_LABELS[item.category] ?? item.category}</span>
                 <span className="text-[10px] text-muted-foreground ml-auto">{item.timestamp}</span>
               </div>
               <p className="text-xs font-mono text-foreground mb-1">{item.title}</p>
@@ -75,7 +107,13 @@ export default function FeedPage() {
                 {item.tags.map(tag => (
                   <span key={tag} className="px-1.5 py-0.5 text-[9px] font-mono bg-secondary text-secondary-foreground rounded-sm">{tag}</span>
                 ))}
-                <Link to={`/country/${item.countryId}`} className="text-[9px] font-mono text-primary hover:underline ml-auto">{item.countryName}</Link>
+                {item.sourceUrl ? (
+                  <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-[9px] font-mono text-primary hover:underline ml-auto">
+                    {item.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                ) : (
+                  <Link to={`/country/${item.countryId}`} className="text-[9px] font-mono text-primary hover:underline ml-auto">{item.countryName}</Link>
+                )}
               </div>
             </div>
           ))}

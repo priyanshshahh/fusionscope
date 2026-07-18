@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { alerts } from '@/data/mockData';
-import { CATEGORY_LABELS, type Severity, type RiskScores, getSeverityColor } from '@/data/types';
+import { alerts as alertsMock } from '@/data/mockData';
+import { CATEGORY_LABELS, type Severity, type RiskScores, type Alert, getSeverityColor } from '@/data/types';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import { Activity, AlertTriangle, Filter } from 'lucide-react';
+import { DataSourceBadge } from '@/components/DataSourceBadge';
+import { apiClient } from '@/lib/api';
+import { convertApiAlertToFrontend, type DataStatus } from '@/lib/convert';
+import { Activity, AlertTriangle, Filter, ExternalLink } from 'lucide-react';
 
 const severities: Severity[] = ['critical', 'high', 'elevated', 'low'];
 const categories: (keyof RiskScores)[] = ['waterStress', 'drought', 'flood', 'foodInsecurity', 'migrationPressure', 'infrastructureDisruption'];
@@ -11,6 +14,28 @@ const categories: (keyof RiskScores)[] = ['waterStress', 'drought', 'flood', 'fo
 export default function AlertsPage() {
   const [sevFilter, setSevFilter] = useState<Severity | 'all'>('all');
   const [catFilter, setCatFilter] = useState<keyof RiskScores | 'all'>('all');
+  const [alerts, setAlerts] = useState<Alert[]>(alertsMock);
+  const [dataStatus, setDataStatus] = useState<DataStatus>('offline');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [alertsResult, metricsResult] = await Promise.all([
+        apiClient.getAlerts(),
+        apiClient.getGlobalMetrics(),
+      ]);
+      if (alertsResult.status === 'success' && alertsResult.data) {
+        setAlerts(alertsResult.data.map(convertApiAlertToFrontend));
+        const source = metricsResult.data?.data_source;
+        setDataStatus(source === 'live' ? 'live' : 'demo');
+      } else {
+        setDataStatus('offline'); // bundled mock stays visible, labeled as such
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
 
   const filtered = useMemo(() => {
     return alerts.filter(a => {
@@ -18,7 +43,7 @@ export default function AlertsPage() {
       if (catFilter !== 'all' && a.category !== catFilter) return false;
       return true;
     });
-  }, [sevFilter, catFilter]);
+  }, [alerts, sevFilter, catFilter]);
 
   return (
     <div className="min-h-screen bg-background terminal-grid">
@@ -27,6 +52,7 @@ export default function AlertsPage() {
         <Link to="/" className="font-mono font-bold text-xs tracking-wider text-foreground hover:text-primary transition-colors">FUSIONSCOPE</Link>
         <span className="text-muted-foreground font-mono text-[10px]">/ ALERTS CENTER</span>
         <div className="flex-1" />
+        <DataSourceBadge status={dataStatus} />
         <Link to="/dashboard" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">DASHBOARD</Link>
         <Link to="/feed" className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors">FEED</Link>
       </div>
@@ -62,15 +88,28 @@ export default function AlertsPage() {
 
         {/* Alert list */}
         <div className="space-y-1">
+          {loading && (
+            <p className="text-xs font-mono text-muted-foreground p-4">Loading alerts…</p>
+          )}
+          {!loading && filtered.length === 0 && (
+            <p className="text-xs font-mono text-muted-foreground p-4 border border-border rounded-sm bg-card">
+              No alerts match the current filters.
+            </p>
+          )}
           {filtered.map(alert => (
             <div key={alert.id} className="flex items-start gap-3 p-3 border border-border rounded-sm bg-card hover:border-primary/20 transition-all">
               <AlertTriangle className={`w-3.5 h-3.5 shrink-0 mt-1 ${getSeverityColor(alert.severity)}`} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <SeverityBadge severity={alert.severity} />
-                  <span className="text-[10px] font-mono text-muted-foreground">{CATEGORY_LABELS[alert.category]}</span>
+                  <span className="text-[10px] font-mono text-muted-foreground">{CATEGORY_LABELS[alert.category] ?? alert.category}</span>
                   <span className="text-[10px] font-mono text-muted-foreground">·</span>
                   <Link to={`/country/${alert.countryId}`} className="text-[10px] font-mono text-primary hover:underline">{alert.countryName}</Link>
+                  {alert.sourceUrl && (
+                    <a href={alert.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-[10px] font-mono text-primary hover:underline">
+                      {alert.source || 'source'} <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
                 </div>
                 <p className="text-xs font-mono text-foreground">{alert.title}</p>
                 <p className="text-[11px] text-muted-foreground mt-1">{alert.description}</p>
