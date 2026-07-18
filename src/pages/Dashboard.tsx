@@ -1,10 +1,11 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { type CountryData, type RiskScores, CATEGORY_LABELS, getSeverityColor } from '@/data/types';
 import { countries as allCountriesMock, alerts as alertsMock, feedItems as feedItemsMock, globalMetrics as globalMetricsMock } from '@/data/mockData';
 import { TerminalCard } from '@/components/TerminalCard';
 import { MetricCard } from '@/components/MetricCard';
 import { SeverityBadge } from '@/components/SeverityBadge';
-import GlobeMap from '@/components/GlobeMap';
+// Code-split the three.js globe so it stays out of the initial bundle.
+const GlobeMap = lazy(() => import('@/components/GlobeMap'));
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Globe, Shield, Zap, Layers, Droplets, Flame, CloudRain, Wheat, Users, Wrench, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
@@ -185,12 +186,18 @@ export default function Dashboard() {
         {/* Center - Map */}
         <div className="flex-1 flex flex-col gap-2">
           <div className="flex-1">
-            <GlobeMap
-              countries={allCountries}
-              activeLayers={activeLayers}
-              onSelectCountry={(c) => setSelectedCountry(c)}
-              selectedCountry={selected?.id || null}
-            />
+            <Suspense fallback={
+              <div className="w-full h-full flex items-center justify-center border border-border rounded-sm bg-background/50">
+                <span className="text-xs font-mono text-muted-foreground">Loading globe…</span>
+              </div>
+            }>
+              <GlobeMap
+                countries={allCountries}
+                activeLayers={activeLayers}
+                onSelectCountry={(c) => setSelectedCountry(c)}
+                selectedCountry={selected?.id || null}
+              />
+            </Suspense>
           </div>
 
           {/* Bottom panels */}

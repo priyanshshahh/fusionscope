@@ -140,17 +140,12 @@ function GlobeMesh({ countries, activeLayers, onSelectCountry, selectedCountry }
   onSelectCountry: (c: CountryData) => void;
   selectedCountry: string | null;
 }) {
-  const globeRef = useRef<THREE.Group>(null);
+  // Auto-rotation is handled by OrbitControls' autoRotate (below), so the
+  // scene no longer needs a manual per-frame group rotation.
   const radius = 1.5;
 
-  useFrame((_, delta) => {
-    if (globeRef.current) {
-      globeRef.current.rotation.y += delta * 0.05;
-    }
-  });
-
   return (
-    <group ref={globeRef}>
+    <group>
       {/* Globe sphere with earth texture */}
       <EarthSphere radius={radius} />
 
@@ -221,7 +216,8 @@ export default function GlobeMap({ countries, activeLayers, onSelectCountry, sel
           enablePan={false}
           minDistance={2.5}
           maxDistance={6}
-          autoRotate={false}
+          autoRotate
+          autoRotateSpeed={0.5}
           enableDamping
           dampingFactor={0.05}
         />
